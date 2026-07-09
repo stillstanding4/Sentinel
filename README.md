@@ -11,6 +11,12 @@ python3 -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
+If the local `streamlit` command is not on PATH after a user-level install, use:
+
+```bash
+python3 -m streamlit run app.py
+```
+
 The application automatically initializes SQLite and seeds permanent Demo Mode data on startup.
 
 ## Demo Walkthrough
@@ -46,6 +52,7 @@ No separate FastAPI server is required for the deployed demo.
 ## Deployment Checklist
 
 - Confirm the app starts locally with `streamlit run app.py`.
+- If `streamlit` is not on local PATH, confirm with `python3 -m streamlit run app.py`.
 - Confirm Demo Mode seeds HR Assistant, Finance Copilot and Procurement Agent.
 - Confirm `requirements.txt` is committed.
 - Confirm `.streamlit/config.toml` is committed.
