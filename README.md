@@ -23,11 +23,12 @@ The application automatically initializes SQLite and seeds permanent Demo Mode d
 
 Recommended executive demo order:
 
-1. Dashboard: Open with enterprise health, risks and latest Sentinel signals.
-2. Agent Catalogue: Show the governed inventory of enterprise AI agents.
-3. Agent Details: Drill into ownership, Trust Score and audit history.
-4. Live Agent Audit: Run Sentinel as an Agent-of-Agents Auditor.
-5. Analytics: Close with trust, policy, cost and recommendation trends.
+1. Enterprise Live Control Room: Open with Sentinel monitoring multiple enterprise Agents in real time.
+2. Dashboard: Show enterprise health, risks and latest Sentinel signals.
+3. Agent Catalogue: Show the governed inventory of enterprise AI agents.
+4. Agent Details: Drill into ownership, Trust Score and audit history.
+5. Live Agent Audit: Run a focused Sentinel audit for one enterprise Agent.
+6. Analytics: Close with trust, policy, cost and recommendation trends.
 
 ## Demo Mode
 
@@ -59,7 +60,7 @@ No separate FastAPI server is required for the deployed demo.
 - Confirm `.streamlit/secrets.toml` is not committed.
 - Confirm `data/*.db` and `data/chroma/` are not committed.
 - Set Streamlit Community Cloud main file path to `app.py`.
-- Run the demo walkthrough in order: Dashboard, Agent Catalogue, Agent Details, Live Agent Audit, Analytics.
+- Run the demo walkthrough in order: Enterprise Live Control Room, Dashboard, Agent Catalogue, Agent Details, Live Agent Audit, Analytics.
 
 ## Architecture
 

@@ -15,12 +15,14 @@ from app.frontend.pages.agent_catalogue import render_agent_catalogue
 from app.frontend.pages.agent_details import render_agent_details
 from app.frontend.pages.analytics import render_analytics
 from app.frontend.pages.dashboard import render_dashboard
+from app.frontend.pages.enterprise_live_control_room import render_enterprise_live_control_room
 from app.frontend.pages.live_audit import render_live_audit
 from app.frontend.state.session_state import ensure_state
 from app.frontend.styles import apply_enterprise_theme
 
 
 PAGES = {
+    "Enterprise Live Control Room": render_enterprise_live_control_room,
     "Dashboard": render_dashboard,
     "Agent Catalogue": render_agent_catalogue,
     "Agent Details": render_agent_details,
@@ -52,23 +54,27 @@ def render_sidebar() -> str:
         <div class="sidebar-panel">
             <div class="sidebar-panel-title">Demo Walkthrough</div>
             <div class="sidebar-step">
-                <div class="sidebar-step-name">1. Dashboard</div>
-                <div class="sidebar-step-text">Open with enterprise health, risks and latest Sentinel signals.</div>
+                <div class="sidebar-step-name">1. Enterprise Live Control Room</div>
+                <div class="sidebar-step-text">Open with Sentinel monitoring multiple enterprise Agents in real time.</div>
             </div>
             <div class="sidebar-step">
-                <div class="sidebar-step-name">2. Agent Catalogue</div>
+                <div class="sidebar-step-name">2. Dashboard</div>
+                <div class="sidebar-step-text">Show enterprise health, risks and latest Sentinel signals.</div>
+            </div>
+            <div class="sidebar-step">
+                <div class="sidebar-step-name">3. Agent Catalogue</div>
                 <div class="sidebar-step-text">Show the governed inventory of enterprise AI agents.</div>
             </div>
             <div class="sidebar-step">
-                <div class="sidebar-step-name">3. Agent Details</div>
+                <div class="sidebar-step-name">4. Agent Details</div>
                 <div class="sidebar-step-text">Drill into ownership, Trust Score and audit history.</div>
             </div>
             <div class="sidebar-step">
-                <div class="sidebar-step-name">4. Live Agent Audit</div>
-                <div class="sidebar-step-text">Run Sentinel as an Agent-of-Agents Auditor.</div>
+                <div class="sidebar-step-name">5. Live Agent Audit</div>
+                <div class="sidebar-step-text">Run a focused Sentinel audit for one enterprise Agent.</div>
             </div>
             <div class="sidebar-step">
-                <div class="sidebar-step-name">5. Analytics</div>
+                <div class="sidebar-step-name">6. Analytics</div>
                 <div class="sidebar-step-text">Close with trust, policy, cost and recommendation trends.</div>
             </div>
         </div>
@@ -90,7 +96,7 @@ def main() -> None:
     try:
         initialize_app()
         page = render_sidebar()
-        renderer = PAGES.get(page, render_dashboard)
+        renderer = PAGES.get(page, render_enterprise_live_control_room)
         renderer()
     except Exception as exc:
         st.error("Sentinel could not load this view.")

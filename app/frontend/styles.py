@@ -90,7 +90,6 @@ def apply_enterprise_theme() -> None:
         .metric-watch .metric-dot { background: var(--sentinel-amber); }
         .metric-risk .metric-dot { background: var(--sentinel-red); }
         .metric-neutral .metric-dot { background: var(--sentinel-blue); }
-        }
         .metric-value {
             color: var(--sentinel-ink);
             font-size: 27px;
@@ -156,7 +155,7 @@ def apply_enterprise_theme() -> None:
             background: #eef2ff;
             color: #1e40af;
         }
-        .status-fail, .status-critical, .status-at-risk {
+        .status-fail, .status-critical, .status-high, .status-at-risk {
             background: #fee2e2;
             color: #991b1b;
             border-color: #fecaca;
@@ -325,6 +324,191 @@ def apply_enterprise_theme() -> None:
             font-size: 12px;
             color: #cbd5e1;
             margin-top: 2px;
+        }
+        .agent-runtime-card {
+            background: #ffffff;
+            border: 1px solid var(--sentinel-line);
+            border-left: 5px solid #64748b;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            min-height: 250px;
+            box-shadow: var(--sentinel-shadow);
+        }
+        .agent-runtime-card.status-receiving-prompt { border-left-color: var(--sentinel-blue); }
+        .agent-runtime-card.status-generating-response { border-left-color: var(--sentinel-amber); }
+        .agent-runtime-card.status-response-ready { border-left-color: var(--sentinel-green); }
+        .agent-card-topline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .agent-unit {
+            color: var(--sentinel-muted);
+            font-size: 11px;
+            font-weight: 780;
+            text-transform: uppercase;
+        }
+        .agent-name {
+            color: var(--sentinel-ink);
+            font-size: 21px;
+            font-weight: 780;
+            margin-top: 3px;
+        }
+        .agent-status {
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            color: #1e3a8a;
+            padding: 5px 9px;
+            font-size: 12px;
+            font-weight: 760;
+            white-space: nowrap;
+        }
+        .agent-field-label {
+            color: var(--sentinel-muted);
+            font-size: 11px;
+            font-weight: 780;
+            text-transform: uppercase;
+            margin-top: 11px;
+        }
+        .agent-field,
+        .agent-response {
+            color: var(--sentinel-ink);
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px 11px;
+            margin-top: 5px;
+            font-size: 13px;
+            line-height: 1.45;
+            min-height: 52px;
+        }
+        .agent-response {
+            min-height: 84px;
+        }
+        .control-tower-panel,
+        .event-feed,
+        .executive-audit-report {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            color: #e2e8f0;
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+        }
+        .control-room-panel-title {
+            color: #f8fafc;
+            font-size: 16px;
+            font-weight: 780;
+            margin-bottom: 12px;
+        }
+        .control-room-progress {
+            height: 9px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            margin: 8px 0 16px;
+            overflow: hidden;
+        }
+        .control-room-progress-fill {
+            height: 100%;
+            background: #2dd4bf;
+            transition: width 0.25s ease;
+        }
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1px solid #243449;
+            background: #111c30;
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 680;
+        }
+        .pipeline-complete {
+            border-color: #134e4a;
+            background: #0f2f2c;
+            color: #ccfbf1;
+        }
+        .pipeline-active {
+            border-color: #38bdf8;
+            background: #12233f;
+            color: #e0f2fe;
+        }
+        .pipeline-marker {
+            font-weight: 900;
+            color: #2dd4bf;
+        }
+        .pipeline-arrow {
+            color: #64748b;
+            margin: 3px 0 3px 17px;
+        }
+        .event-feed {
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .event-feed-row {
+            border-top: 1px solid #243449;
+            padding: 8px 0;
+            color: #dbeafe;
+            font-size: 13px;
+        }
+        .policy-row {
+            display: grid;
+            grid-template-columns: 72px 1fr;
+            gap: 12px;
+            background: #ffffff;
+            border: 1px solid var(--sentinel-line);
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .policy-id {
+            color: var(--sentinel-blue);
+            font-weight: 800;
+            font-size: 13px;
+        }
+        .policy-name {
+            color: var(--sentinel-ink);
+            font-weight: 760;
+            font-size: 14px;
+        }
+        .policy-rule {
+            color: var(--sentinel-muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .report-item {
+            background: #111c30;
+            border: 1px solid #243449;
+            padding: 13px;
+            min-height: 104px;
+        }
+        .report-risk {
+            border-color: #7f1d1d;
+            background: #26131b;
+        }
+        .report-label {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 780;
+            text-transform: uppercase;
+        }
+        .report-value {
+            color: #f8fafc;
+            font-size: 15px;
+            font-weight: 720;
+            margin-top: 8px;
+            overflow-wrap: anywhere;
+        }
+        @media (max-width: 1100px) {
+            .report-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
         </style>
         """,
