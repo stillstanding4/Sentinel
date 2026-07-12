@@ -196,25 +196,25 @@ def _render_pipeline(container: Any, active_index: int, completed_count: int) ->
             marker = "○"
         arrow = "<div class='pipeline-arrow'>↓</div>" if index < len(PIPELINE_STEPS) - 1 else ""
         steps_html.append(
-            f"""
-            <div class="pipeline-step pipeline-{state}">
-                <span class="pipeline-marker">{marker}</span>
-                <span>{escape(step)}</span>
-            </div>
-            {arrow}
-            """
+            (
+                f'<div class="pipeline-step pipeline-{state}">'
+                f'<span class="pipeline-marker">{marker}</span>'
+                f"<span>{escape(step)}</span>"
+                "</div>"
+                f"{arrow}"
+            )
         )
 
     container.markdown(
-        f"""
-        <div class="control-tower-panel">
-            <div class="control-room-panel-title">Sentinel Monitoring Pipeline</div>
-            <div class="control-room-progress">
-                <div class="control-room-progress-fill" style="width: {progress * 100:.0f}%"></div>
-            </div>
-            {''.join(steps_html)}
-        </div>
-        """,
+        (
+            '<div class="control-tower-panel">'
+            '<div class="control-room-panel-title">Sentinel Monitoring Pipeline</div>'
+            '<div class="control-room-progress">'
+            f'<div class="control-room-progress-fill" style="width: {progress * 100:.0f}%"></div>'
+            "</div>"
+            f"{''.join(steps_html)}"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
 
@@ -225,12 +225,12 @@ def _render_event_feed(container: Any, events: list[str]) -> None:
         f"<div class='event-feed-row'>{escape(event)}</div>" for event in reversed(visible_events)
     )
     container.markdown(
-        f"""
-        <div class="event-feed">
-            <div class="control-room-panel-title">Live Detections</div>
-            {event_items}
-        </div>
-        """,
+        (
+            '<div class="event-feed">'
+            '<div class="control-room-panel-title">Live Detections</div>'
+            f"{event_items}"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
 
@@ -260,45 +260,29 @@ def _render_executive_audit_report(container: Any, results: list[dict]) -> None:
     cost_savings = _estimated_cost_savings(cost_result["audit_run"]["total_tokens"])
 
     container.markdown(
-        f"""
-        <div class="executive-audit-report">
-            <div class="control-room-panel-title">Executive Audit Report</div>
-            <div class="report-grid">
-                <div class="report-item">
-                    <div class="report-label">Trust Score</div>
-                    <div class="report-value">{worst_result['trust_score']['overall_score']}</div>
-                </div>
-                <div class="report-item report-risk">
-                    <div class="report-label">Risk Level</div>
-                    <div class="report-value">{status_badge(report['risk_level'], report['risk_level'].lower())}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Policies Violated</div>
-                    <div class="report-value">{escape(', '.join(sorted(set(policies_violated))) or 'None')}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Business Impact</div>
-                    <div class="report-value">{escape(report['business_impact'])}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Recommended Action</div>
-                    <div class="report-value">{escape(recommended_action)}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Owner</div>
-                    <div class="report-value">{escape(report['recommended_owner'])}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Estimated Cost Savings</div>
-                    <div class="report-value">{escape(cost_savings)}</div>
-                </div>
-                <div class="report-item">
-                    <div class="report-label">Confidence</div>
-                    <div class="report-value">{confidence}%</div>
-                </div>
-            </div>
-        </div>
-        """,
+        (
+            '<div class="executive-audit-report">'
+            '<div class="control-room-panel-title">Executive Audit Report</div>'
+            '<div class="report-grid">'
+            '<div class="report-item"><div class="report-label">Trust Score</div>'
+            f'<div class="report-value">{worst_result["trust_score"]["overall_score"]}</div></div>'
+            '<div class="report-item report-risk"><div class="report-label">Risk Level</div>'
+            f'<div class="report-value">{status_badge(report["risk_level"], report["risk_level"].lower())}</div></div>'
+            '<div class="report-item"><div class="report-label">Policies Violated</div>'
+            f'<div class="report-value">{escape(", ".join(sorted(set(policies_violated))) or "None")}</div></div>'
+            '<div class="report-item"><div class="report-label">Business Impact</div>'
+            f'<div class="report-value">{escape(report["business_impact"])}</div></div>'
+            '<div class="report-item"><div class="report-label">Recommended Action</div>'
+            f'<div class="report-value">{escape(recommended_action)}</div></div>'
+            '<div class="report-item"><div class="report-label">Owner</div>'
+            f'<div class="report-value">{escape(report["recommended_owner"])}</div></div>'
+            '<div class="report-item"><div class="report-label">Estimated Cost Savings</div>'
+            f'<div class="report-value">{escape(cost_savings)}</div></div>'
+            '<div class="report-item"><div class="report-label">Confidence</div>'
+            f'<div class="report-value">{confidence}%</div></div>'
+            "</div>"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
 
