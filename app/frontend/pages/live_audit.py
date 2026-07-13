@@ -12,7 +12,9 @@ from app.backend.services.feedback_service import FeedbackService
 from app.demo.scenarios import DEMO_SCENARIOS
 from app.frontend.components.layout import empty_state, page_header, section_divider
 from app.frontend.components.metric_cards import metric_card, status_badge
+from app.frontend.components.policies import infer_policy_ids_for_result, policy_violation_cards_html
 from app.frontend.components.tables import dataframe
+from app.frontend.components.trust_scores import trust_score_state
 
 
 def _run_interactive_audit(audit_runner: Callable[[ProgressCallback], dict]) -> dict:
@@ -41,7 +43,8 @@ def _render_result(result: dict) -> None:
     audit_run = result["audit_run"]
     trust_score = result.get("trust_score") or {}
     executive_summary = result.get("executive_summary") or {}
-    risk_badge = result.get("risk_badge") or {"label": "Low", "status": "low"}
+    overall_score = trust_score.get("overall_score", 0)
+    trust_state = trust_score_state(overall_score)
     section_divider("Live Agent Audit Result", "Sentinel has captured, evaluated, scored and stored this Agent execution.")
     cols = st.columns(5)
     with cols[0]:
@@ -51,9 +54,9 @@ def _render_result(result: dict) -> None:
     with cols[2]:
         metric_card("Estimated Cost", f"${audit_run['estimated_cost']:.4f}", "Average Cost per Run signal", "neutral")
     with cols[3]:
-        metric_card("Trust Score", str(trust_score.get("overall_score", 0)), "Overall Trust Score", _risk_to_metric_status(risk_badge["label"]))
+        metric_card("Trust Score", str(overall_score), "Overall Trust Score", trust_state["metric_status"])
     with cols[4]:
-        metric_card("Risk Level", risk_badge["label"], "Enterprise risk badge", _risk_to_metric_status(risk_badge["label"]))
+        metric_card("Risk Level", trust_state["label"], "Enterprise Trust Score band", trust_state["metric_status"])
 
     _render_executive_summary(executive_summary)
     _render_score_breakdown(result)
@@ -75,17 +78,11 @@ def _render_result(result: dict) -> None:
             ]
         )
     with tabs[1]:
-        if result["policy_violations"]:
-            dataframe(
-                [
-                    {
-                        "Type": item["violation_type"],
-                        "Status": item["policy_status"],
-                        "Severity": item["severity"],
-                        "Evidence": item["evidence"],
-                    }
-                    for item in result["policy_violations"]
-                ]
+        policy_ids = infer_policy_ids_for_result(result)
+        if policy_ids:
+            st.markdown(
+                f'<div class="policy-violation-list">{policy_violation_cards_html(policy_ids)}</div>',
+                unsafe_allow_html=True,
             )
         else:
             st.success("Policy Evaluator returned PASS.")
@@ -155,7 +152,8 @@ def _render_score_breakdown(result: dict) -> None:
         return
 
     section_divider("Explainable Trust Score", "Weighted contribution of each factor to the Agent trust decision.")
-    st.metric("Overall Trust Score", trust_score["overall_score"])
+    state = trust_score_state(trust_score["overall_score"])
+    st.metric("Overall Trust Score", trust_score["overall_score"], state["label"])
     for factor in breakdown:
         st.progress(
             factor["score"] / 100,
@@ -201,7 +199,7 @@ def _render_recommendation_cards(cards: list[dict]) -> None:
 
 def _render_audit_timeline(timeline: list[dict]) -> None:
     if not timeline:
-        for step in ["Agent Executed", "Captured", "Hallucination Check", "Policy Validation", "Trust Calculation", "Recommendations", "Completed"]:
+        for step in ["Agent Executed", "Captured", "Hallucination Check", "Policy Validation", "Trust Calculation", "Recommendations", "Governance Complete"]:
             st.markdown(f'<div class="audit-step">{step}</div>', unsafe_allow_html=True)
         return
     for index, item in enumerate(timeline):
@@ -218,15 +216,6 @@ def _render_audit_timeline(timeline: list[dict]) -> None:
         )
         if arrow:
             st.markdown("<div style='margin-left: 190px; color: #667085;'>↓</div>", unsafe_allow_html=True)
-
-
-def _risk_to_metric_status(risk_level: str) -> str:
-    risk = risk_level.lower()
-    if risk in {"critical", "high"}:
-        return "risk"
-    if risk == "medium":
-        return "watch"
-    return "good"
 
 
 def render_live_audit() -> None:

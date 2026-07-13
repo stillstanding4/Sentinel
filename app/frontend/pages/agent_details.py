@@ -7,6 +7,7 @@ from app.frontend.components.charts import trust_score_gauge
 from app.frontend.components.layout import empty_state, page_header
 from app.frontend.components.metric_cards import metric_card
 from app.frontend.components.tables import dataframe
+from app.frontend.components.trust_scores import trust_score_state
 
 
 def render_agent_details() -> None:
@@ -38,6 +39,8 @@ def render_agent_details() -> None:
         metric_card("Agent Type", agent["agent_type"], agent["status"], "good" if agent["status"] == "active" else "watch")
     with right:
         if score:
+            state = trust_score_state(score["overall_score"])
+            metric_card("Trust State", state["label"], f"Trust Score {score['overall_score']}", state["metric_status"])
             st.plotly_chart(trust_score_gauge(score["overall_score"]), use_container_width=True)
         else:
             empty_state("No Trust Score available", "Run Live Agent Audit to generate the first Trust Score.")
@@ -52,7 +55,7 @@ def render_agent_details() -> None:
                     "Tokens": run["total_tokens"],
                     "Cost": f"${run['estimated_cost']:.4f}",
                     "Status": run["status"],
-                    "Completed": run.get("completed_at"),
+                    "Governance Completed At": run.get("completed_at"),
                 }
                 for run in details["audit_runs"]
             ]

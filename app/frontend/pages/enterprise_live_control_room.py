@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
 import time
 from typing import Any
@@ -8,8 +9,14 @@ import streamlit as st
 
 from app.backend.services.audit_service import AuditService
 from app.demo.scenarios import DEMO_SCENARIOS
-from app.frontend.components.layout import page_header, section_divider
-from app.frontend.components.metric_cards import metric_card, status_badge
+from app.frontend.components.layout import page_header
+from app.frontend.components.policies import (
+    infer_policy_ids_for_result,
+    policy_event_text,
+    policy_metadata,
+    policy_violation_cards_html,
+)
+from app.frontend.components.trust_scores import trust_score_state
 
 
 AGENT_SEQUENCE = [
@@ -19,169 +26,323 @@ AGENT_SEQUENCE = [
 ]
 
 PIPELINE_STEPS = [
-    "Capture Prompt",
-    "Inspect Response",
-    "Run Policy Engine",
-    "Run PII Detection",
-    "Run Hallucination Detection",
-    "Run Cost Analysis",
-    "Calculate Trust Score",
-    "Generate Recommendations",
+    "Capturing Prompt",
+    "Inspecting Response",
+    "Policy Engine",
+    "PII Detection",
+    "Hallucination Detection",
+    "Cost Analysis",
+    "Trust Score Calculation",
+    "Recommendations",
 ]
 
-POLICY_LIBRARY = [
-    {
-        "id": "P001",
-        "name": "No Personally Identifiable Information",
-        "rule": "Block SSN, Aadhaar, Passport, Email and Phone.",
-    },
-    {
-        "id": "P002",
-        "name": "Financial Grounding",
-        "rule": "Financial claims must reference trusted enterprise sources.",
-    },
-    {
-        "id": "P003",
-        "name": "Prompt Injection Protection",
-        "rule": "Ignore instructions attempting to override system prompts.",
-    },
-    {
-        "id": "P004",
-        "name": "Cost Governance",
-        "rule": "Large token usage should recommend optimization.",
-    },
-    {
-        "id": "P005",
-        "name": "Hallucination Threshold",
-        "rule": "Responses with insufficient confidence require Human Review.",
-    },
+POLICY_CHECKS = [
+    {"id": "P001", "fails_for": {"hr_pii_leak"}},
+    {"id": "P002", "fails_for": {"finance_hallucination"}},
+    {"id": "P003", "fails_for": set()},
+    {"id": "P004", "fails_for": {"procurement_high_tokens"}},
+    {"id": "P005", "fails_for": {"hr_pii_leak", "finance_hallucination", "procurement_high_tokens"}},
 ]
+
+STATUS_SEQUENCE = ["Receiving Prompt", "Generating Response", "Auditing", "Governance Complete"]
+DEFAULT_AGENT_KEY = AGENT_SEQUENCE[0][0]
+
+STARTED_KEY = "control_room_started"
+COMPLETED_KEY = "control_room_completed"
+RESULTS_KEY = "control_room_results"
+EVENTS_KEY = "control_room_events"
+SELECTED_AGENT_KEY = "control_room_selected_agent"
 
 
 def render_enterprise_live_control_room() -> None:
+    _ensure_control_room_state()
     page_header(
         "Enterprise Live Control Room",
-        "Sentinel actively monitors multiple enterprise AI agents as an Agent-of-Agents Auditor.",
+        "Sentinel watches enterprise AI agents in real time, audits their responses and turns risk signals into executive action.",
         eyebrow="AI Operations Center",
     )
 
-    top_cols = st.columns(4)
-    with top_cols[0]:
-        metric_card("Monitoring Mode", "Live Demo", "Three enterprise Agents", "neutral")
-    with top_cols[1]:
-        metric_card("Policy Library", "5", "Enterprise controls active", "good")
-    with top_cols[2]:
-        metric_card("Agent Coverage", "3", "HR, Finance, Procurement", "good")
-    with top_cols[3]:
-        metric_card("Audit Runtime", "6-8s", "SOC-style simulation", "watch")
+    start_requested = _render_start_action()
+    if start_requested:
+        _reset_control_room_run()
+        st.session_state[STARTED_KEY] = True
 
-    with st.expander("Enterprise Policy Library", expanded=False):
-        for policy in POLICY_LIBRARY:
-            st.markdown(
-                f"""
-                <div class="policy-row">
-                    <div class="policy-id">{escape(policy['id'])}</div>
-                    <div>
-                        <div class="policy-name">{escape(policy['name'])}</div>
-                        <div class="policy-rule">{escape(policy['rule'])}</div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    if not st.session_state[STARTED_KEY]:
+        return
 
-    left, right = st.columns([0.47, 0.53], gap="large")
+    left, right = st.columns([0.58, 0.42], gap="large")
     with left:
-        section_divider("Enterprise AI Agents", "Three simultaneously running enterprise AI agents.")
-        agent_containers = {scenario_key: st.empty() for scenario_key, _unit in AGENT_SEQUENCE}
+        selected_agent_key = _render_agent_selector()
+        agent_container = st.empty()
+
     with right:
-        section_divider("Sentinel Control Tower", "Policy, risk, cost and trust evaluation pipeline.")
-        pipeline_container = st.empty()
+        tower_container = st.empty()
         event_container = st.empty()
-        report_container = st.empty()
 
-    _render_agent_cards(agent_containers, active_status={})
-    _render_pipeline(pipeline_container, active_index=-1, completed_count=0)
-    _render_event_feed(event_container, ["Sentinel monitoring standby."])
+    if start_requested:
+        _run_control_room_simulation(selected_agent_key, agent_container, tower_container, event_container)
+        return
 
-    if st.button("Start Enterprise Live Control Room", type="primary"):
-        results = _run_control_room_simulation(
-            agent_containers,
-            pipeline_container,
-            event_container,
-        )
-        _render_executive_audit_report(report_container, results)
-        st.success("Enterprise audit complete. Dashboard, Agent Catalogue, Agent Details and Analytics have been updated.")
+    _render_persisted_control_room_state(selected_agent_key, agent_container, tower_container, event_container)
 
 
-def _run_control_room_simulation(
-    agent_containers: dict[str, Any],
-    pipeline_container: Any,
-    event_container: Any,
-) -> list[dict]:
-    events: list[str] = ["Sentinel activated enterprise monitoring."]
-    active_status: dict[str, str] = {}
-    audit_service = AuditService()
-
-    for scenario_key, _unit in AGENT_SEQUENCE:
-        for status in ["Receiving Prompt", "Generating Response", "Response Ready"]:
-            active_status[scenario_key] = status
-            _render_agent_cards(agent_containers, active_status)
-            events.append(f"{_agent_name(scenario_key)}: {status}.")
-            if status == "Response Ready":
-                events.append(f"Sentinel automatically queued {_agent_name(scenario_key)} for audit.")
-            _render_event_feed(event_container, events)
-            time.sleep(0.28)
-
-    events.append("Sentinel detected three completed agent responses.")
-    _render_event_feed(event_container, events)
-
-    results: list[dict] = []
-    for index, step in enumerate(PIPELINE_STEPS):
-        _render_pipeline(pipeline_container, active_index=index, completed_count=index)
-        events.extend(_events_for_step(step))
-        _render_event_feed(event_container, events)
-        time.sleep(0.55)
-
-        if step == "Calculate Trust Score":
-            results = [audit_service.run_demo_scenario(scenario_key) for scenario_key, _unit in AGENT_SEQUENCE]
-            events.extend(_events_for_results(results))
-            _render_event_feed(event_container, events)
-
-    _render_pipeline(pipeline_container, active_index=-1, completed_count=len(PIPELINE_STEPS))
-    events.append("Completed: Executive Audit Report generated.")
-    _render_event_feed(event_container, events)
-    return results
+def _ensure_control_room_state() -> None:
+    st.session_state.setdefault(STARTED_KEY, False)
+    st.session_state.setdefault(COMPLETED_KEY, False)
+    st.session_state.setdefault(RESULTS_KEY, [])
+    st.session_state.setdefault(EVENTS_KEY, [])
+    st.session_state.setdefault(SELECTED_AGENT_KEY, DEFAULT_AGENT_KEY)
 
 
-def _render_agent_cards(containers: dict[str, Any], active_status: dict[str, str]) -> None:
-    for scenario_key, unit in AGENT_SEQUENCE:
-        scenario = DEMO_SCENARIOS[scenario_key]
-        status = active_status.get(scenario_key, "Waiting")
-        prompt = scenario["input_text"] if status != "Waiting" else "Awaiting enterprise user prompt."
-        response = scenario["output_text"] if status == "Response Ready" else "Response stream pending."
-        status_class = status.lower().replace(" ", "-")
-        containers[scenario_key].markdown(
-            f"""
-            <div class="agent-runtime-card status-{status_class}">
-                <div class="agent-card-topline">
-                    <div>
-                        <div class="agent-unit">{escape(unit)}</div>
-                        <div class="agent-name">{escape(scenario['agent_name'])}</div>
-                    </div>
-                    <div class="agent-status">{escape(status)}</div>
-                </div>
-                <div class="agent-field-label">Current User Prompt</div>
-                <div class="agent-field">{escape(prompt)}</div>
-                <div class="agent-field-label">AI Generated Response</div>
-                <div class="agent-response">{escape(response)}</div>
+def _render_start_action() -> bool:
+    if not st.session_state[STARTED_KEY]:
+        left, center, right = st.columns([0.34, 0.32, 0.34])
+        with center:
+            return st.button("Start Enterprise Live Audit", type="primary", use_container_width=True)
+
+    action_left, action_right = st.columns([0.74, 0.26], gap="large")
+    with action_left:
+        st.markdown(
+            """
+            <div class="control-room-live-note">
+                Sentinel live audit workspace
             </div>
             """,
             unsafe_allow_html=True,
         )
+    with action_right:
+        return st.button("Start Enterprise Live Audit", type="primary", use_container_width=True)
 
 
-def _render_pipeline(container: Any, active_index: int, completed_count: int) -> None:
+def _reset_control_room_run() -> None:
+    selected_agent_key = st.session_state.get(SELECTED_AGENT_KEY, DEFAULT_AGENT_KEY)
+    st.session_state[COMPLETED_KEY] = False
+    st.session_state[RESULTS_KEY] = []
+    st.session_state[EVENTS_KEY] = []
+    st.session_state[SELECTED_AGENT_KEY] = selected_agent_key
+
+
+def _render_agent_selector() -> str:
+    st.markdown('<div class="control-room-section-title">Enterprise AI Agents</div>', unsafe_allow_html=True)
+    selected_agent_key = st.segmented_control(
+        "Enterprise AI Agents",
+        options=[scenario_key for scenario_key, _unit in AGENT_SEQUENCE],
+        format_func=_agent_name,
+        key=SELECTED_AGENT_KEY,
+        label_visibility="collapsed",
+    )
+    return selected_agent_key or DEFAULT_AGENT_KEY
+
+
+def _render_persisted_control_room_state(
+    selected_agent_key: str,
+    agent_container: Any,
+    tower_container: Any,
+    event_container: Any,
+) -> None:
+    results = st.session_state.get(RESULTS_KEY, [])
+    events = st.session_state.get(EVENTS_KEY, [])
+
+    if st.session_state.get(COMPLETED_KEY) and results:
+        result = _result_for_agent(results, selected_agent_key)
+        _render_agent_workspace(agent_container, selected_agent_key, "Governance Complete", DEMO_SCENARIOS[selected_agent_key]["output_text"])
+        _render_audit_result(tower_container, result)
+        _render_event_feed(event_container, events)
+        return
+
+    _render_agent_workspace(agent_container, selected_agent_key, "Receiving Prompt", "")
+    _render_pipeline(tower_container, active_index=-1, completed_count=0)
+    _render_event_feed(event_container, [_event("Sentinel monitoring is ready.")])
+
+
+def _run_control_room_simulation(
+    selected_agent_key: str,
+    agent_container: Any,
+    tower_container: Any,
+    event_container: Any,
+) -> None:
+    scenario = DEMO_SCENARIOS[selected_agent_key]
+    response = scenario["output_text"]
+    events = [_event(f"{scenario['agent_name']} received prompt.")]
+
+    _render_agent_workspace(agent_container, selected_agent_key, "Receiving Prompt", "")
+    _render_pipeline(tower_container, active_index=-1, completed_count=0)
+    _render_event_feed(event_container, events)
+    time.sleep(0.35)
+
+    _append_event(events, f"{scenario['agent_name']} started generating response.")
+    for partial_response in _response_frames(response):
+        _render_agent_workspace(agent_container, selected_agent_key, "Generating Response", partial_response)
+        _render_event_feed(event_container, events)
+        time.sleep(0.25)
+
+    _append_event(events, f"{scenario['agent_name']} generated response.")
+    _render_agent_workspace(agent_container, selected_agent_key, "Auditing", response)
+    _render_event_feed(event_container, events)
+    time.sleep(0.25)
+
+    audit_service = AuditService()
+    results: list[dict] = []
+    for index, step in enumerate(PIPELINE_STEPS):
+        if step == "Policy Engine":
+            _run_policy_checks(
+                selected_agent_key,
+                tower_container,
+                event_container,
+                events,
+                index,
+            )
+            continue
+
+        _render_pipeline(tower_container, active_index=index, completed_count=index)
+        for event_message in _events_for_step(step, selected_agent_key):
+            _append_event(events, event_message)
+        _render_event_feed(event_container, events)
+        time.sleep(0.55)
+
+        if step == "Trust Score Calculation":
+            results = [audit_service.run_demo_scenario(scenario_key) for scenario_key, _unit in AGENT_SEQUENCE]
+            selected_result = _result_for_agent(results, selected_agent_key)
+            _append_event(events, f"Trust Score = {selected_result['trust_score']['overall_score']}.")
+            _render_event_feed(event_container, events)
+
+    if not results:
+        results = [audit_service.run_demo_scenario(scenario_key) for scenario_key, _unit in AGENT_SEQUENCE]
+
+    selected_result = _result_for_agent(results, selected_agent_key)
+    _append_event(events, "Recommendation generated.")
+    _append_event(events, "Dashboard, Agent Catalogue, Agent Details and Analytics updated.")
+    _render_agent_workspace(agent_container, selected_agent_key, "Governance Complete", response)
+    _render_audit_result(tower_container, selected_result)
+    _render_event_feed(event_container, events)
+
+    st.session_state[RESULTS_KEY] = results
+    st.session_state[EVENTS_KEY] = events
+    st.session_state[COMPLETED_KEY] = True
+
+
+def _run_policy_checks(
+    scenario_key: str,
+    tower_container: Any,
+    event_container: Any,
+    events: list[dict[str, str]],
+    pipeline_index: int,
+) -> dict[str, str]:
+    policy_states: dict[str, str] = {}
+    _append_event(events, "Policy Engine started enterprise policy checks.")
+    _render_event_feed(event_container, events)
+
+    for policy_index, policy in enumerate(POLICY_CHECKS):
+        _render_pipeline(
+            tower_container,
+            active_index=pipeline_index,
+            completed_count=pipeline_index,
+            policy_states=policy_states,
+            active_policy_index=policy_index,
+        )
+        metadata = policy_metadata(policy["id"])
+        _append_event(events, f"{metadata['id']} - {metadata['name']} checking.")
+        _render_event_feed(event_container, events)
+        time.sleep(0.28)
+
+        failed = scenario_key in policy["fails_for"]
+        policy_states[policy["id"]] = "fail" if failed else "pass"
+        if failed:
+            _append_event(events, policy_event_text(policy["id"], failed=True))
+            _render_pipeline(
+                tower_container,
+                active_index=pipeline_index,
+                completed_count=pipeline_index,
+                policy_states=policy_states,
+                active_policy_index=policy_index,
+                alert=policy,
+            )
+            _render_event_feed(event_container, events)
+            time.sleep(0.85)
+        else:
+            _append_event(events, policy_event_text(policy["id"], failed=False))
+            _render_pipeline(
+                tower_container,
+                active_index=pipeline_index,
+                completed_count=pipeline_index,
+                policy_states=policy_states,
+                active_policy_index=policy_index,
+            )
+            _render_event_feed(event_container, events)
+            time.sleep(0.16)
+
+    _render_pipeline(
+        tower_container,
+        active_index=-1,
+        completed_count=pipeline_index + 1,
+        policy_states=policy_states,
+    )
+    return policy_states
+
+
+def _render_agent_workspace(container: Any, scenario_key: str, status: str, response_text: str) -> None:
+    scenario = DEMO_SCENARIOS[scenario_key]
+    business_unit = _business_unit(scenario_key)
+    response_html = escape(response_text) if response_text else "Waiting for AI response..."
+    status_class = status.lower().replace(" ", "-")
+
+    container.markdown(
+        f"""
+        <div class="agent-focus-card status-{status_class}">
+            <div class="agent-focus-header">
+                <div>
+                    <div class="agent-focus-name">{escape(scenario['agent_name'])}</div>
+                    <div class="agent-focus-meta">{escape(business_unit)}</div>
+                </div>
+                <div class="agent-focus-status">{escape(status)}</div>
+            </div>
+            <div class="conversation-panel">
+                <div class="chat-row chat-row-user">
+                    <div class="chat-avatar">U</div>
+                    <div class="chat-bubble chat-user">{escape(scenario['input_text'])}</div>
+                </div>
+                <div class="chat-row chat-row-ai">
+                    <div class="chat-bubble chat-ai">{response_html}</div>
+                    <div class="chat-avatar chat-avatar-ai">AI</div>
+                </div>
+            </div>
+            <div class="agent-status-rail">
+                {_status_rail_html(status)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _status_rail_html(current_status: str) -> str:
+    current_index = STATUS_SEQUENCE.index(current_status) if current_status in STATUS_SEQUENCE else 0
+    items = []
+    for index, status in enumerate(STATUS_SEQUENCE):
+        if index < current_index:
+            state = "complete"
+            marker = "✓"
+        elif index == current_index:
+            state = "active"
+            marker = "●"
+        else:
+            state = "pending"
+            marker = "○"
+        arrow = '<span class="status-arrow">↓</span>' if index < len(STATUS_SEQUENCE) - 1 else ""
+        items.append(
+            f'<span class="status-step status-{state}"><span>{marker}</span>{escape(status)}</span>{arrow}'
+        )
+    return "".join(items)
+
+
+def _render_pipeline(
+    container: Any,
+    active_index: int,
+    completed_count: int,
+    policy_states: dict[str, str] | None = None,
+    active_policy_index: int | None = None,
+    alert: dict | None = None,
+) -> None:
     progress = completed_count / len(PIPELINE_STEPS)
     steps_html = []
     for index, step in enumerate(PIPELINE_STEPS):
@@ -194,23 +355,27 @@ def _render_pipeline(container: Any, active_index: int, completed_count: int) ->
         else:
             state = "pending"
             marker = "○"
-        arrow = "<div class='pipeline-arrow'>↓</div>" if index < len(PIPELINE_STEPS) - 1 else ""
+        arrow = '<div class="pipeline-flow-arrow">↓</div>' if index < len(PIPELINE_STEPS) - 1 else ""
         steps_html.append(
             (
-                f'<div class="pipeline-step pipeline-{state}">'
-                f'<span class="pipeline-marker">{marker}</span>'
-                f"<span>{escape(step)}</span>"
+                f'<div class="tower-step tower-{state}">'
+                f'<span class="tower-step-marker">{marker}</span>'
+                f'<span>{escape(step)}</span>'
                 "</div>"
+                f"{_policy_checks_html(index, active_policy_index, policy_states)}"
                 f"{arrow}"
             )
         )
 
+    alert_html = _policy_alert_html(alert) if alert else ""
     container.markdown(
         (
-            '<div class="control-tower-panel">'
-            '<div class="control-room-panel-title">Sentinel Monitoring Pipeline</div>'
-            '<div class="control-room-progress">'
-            f'<div class="control-room-progress-fill" style="width: {progress * 100:.0f}%"></div>'
+            '<div class="sentinel-tower-card">'
+            '<div class="tower-eyebrow">Sentinel Control Tower</div>'
+            '<div class="tower-title">Audit workflow</div>'
+            f"{alert_html}"
+            '<div class="tower-progress">'
+            f'<div class="tower-progress-fill" style="width: {progress * 100:.0f}%"></div>'
             "</div>"
             f"{''.join(steps_html)}"
             "</div>"
@@ -219,15 +384,119 @@ def _render_pipeline(container: Any, active_index: int, completed_count: int) ->
     )
 
 
-def _render_event_feed(container: Any, events: list[str]) -> None:
-    visible_events = events[-11:]
+def _policy_checks_html(
+    pipeline_index: int,
+    active_policy_index: int | None,
+    policy_states: dict[str, str] | None,
+) -> str:
+    if pipeline_index != PIPELINE_STEPS.index("Policy Engine"):
+        return ""
+    if policy_states is None and active_policy_index is None:
+        return ""
+
+    policy_states = policy_states or {}
+    rows = []
+    for index, policy in enumerate(POLICY_CHECKS):
+        metadata = policy_metadata(policy["id"])
+        state = policy_states.get(policy["id"], "pending")
+        if active_policy_index == index and state == "pending":
+            state = "active"
+        marker = {"pass": "✓", "fail": "!", "active": "●"}.get(state, "○")
+        rows.append(
+            (
+                f'<div class="policy-check-row policy-check-{state}">'
+                f'<span class="policy-check-marker">{marker}</span>'
+                f'<span class="policy-check-id">{escape(metadata["id"])}</span>'
+                f'<span>{escape(metadata["name"])}</span>'
+                "</div>"
+            )
+        )
+    return f'<div class="policy-check-list">{"".join(rows)}</div>'
+
+
+def _policy_alert_html(policy: dict) -> str:
+    metadata = policy_metadata(policy["id"])
+    severity = str(metadata["severity"]).lower()
+    return (
+        f'<div class="policy-alert policy-alert-{escape(severity)}">'
+        '<div class="policy-alert-title">🚨 Policy Violation Detected</div>'
+        '<div class="policy-alert-grid">'
+        f'<div><span>Policy ID</span><strong>{escape(metadata["id"])}</strong></div>'
+        f'<div><span>Policy Name</span><strong>{escape(metadata["name"])}</strong></div>'
+        f'<div><span>Severity</span><strong>{escape(metadata["severity"])}</strong></div>'
+        "</div>"
+        f'<div class="policy-alert-explanation">{escape(metadata["failure_explanation"])}</div>'
+        "</div>"
+    )
+
+
+def _render_audit_result(container: Any, result: dict) -> None:
+    audit_run = result["audit_run"]
+    trust_score = result["trust_score"]["overall_score"]
+    trust_state = trust_score_state(trust_score)
+    summary = result["executive_summary"]
+    policy_ids = infer_policy_ids_for_result(result)
+    recommendation = _recommended_action(result)
+    confidence = _average_confidence([result])
+    savings = _estimated_cost_savings(audit_run["total_tokens"])
+
+    container.markdown(
+        (
+            '<div class="audit-result-card">'
+            '<div class="tower-eyebrow">Audit Result</div>'
+            '<div class="audit-result-hero">'
+            '<div><div class="result-label">Trust Score</div>'
+            f'<div class="result-score result-score-{trust_state["status"]}">{trust_score}</div></div>'
+            f'<div class="risk-chip risk-{trust_state["status"]}">{trust_state["label"]}</div>'
+            "</div>"
+            '<div class="result-detail-stack">'
+            f'{_policy_result_line(policy_ids)}'
+            f'{_result_line("Business Impact", summary["business_impact"])}'
+            f'{_result_line("Recommended Action", recommendation)}'
+            f'{_result_line("Owner", summary["recommended_owner"])}'
+            f'{_result_line("Estimated Savings", savings)}'
+            f'{_result_line("Confidence", f"{confidence}%")}'
+            "</div>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def _result_line(label: str, value: str) -> str:
+    return (
+        '<div class="result-line">'
+        f'<div class="result-line-label">{escape(label)}</div>'
+        f'<div class="result-line-value">{escape(value)}</div>'
+        "</div>"
+    )
+
+
+def _policy_result_line(policy_ids: list[str]) -> str:
+    return (
+        '<div class="result-line">'
+        '<div class="result-line-label">Policies Violated</div>'
+        f'<div class="result-line-value">{policy_violation_cards_html(policy_ids, compact=True)}</div>'
+        "</div>"
+    )
+
+
+def _render_event_feed(container: Any, events: list[dict[str, str]]) -> None:
+    if not events:
+        events = [_event("Sentinel monitoring is ready.")]
     event_items = "".join(
-        f"<div class='event-feed-row'>{escape(event)}</div>" for event in reversed(visible_events)
+        (
+            '<div class="event-stream-row">'
+            f'<div class="event-time">{escape(item["time"])}</div>'
+            f'<div class="event-message">{escape(item["message"])}</div>'
+            "</div>"
+        )
+        for item in reversed(events)
     )
     container.markdown(
         (
-            '<div class="event-feed">'
-            '<div class="control-room-panel-title">Live Detections</div>'
+            '<div class="event-stream-card">'
+            '<div class="event-stream-title">Live Event Feed</div>'
             f"{event_items}"
             "</div>"
         ),
@@ -235,85 +504,85 @@ def _render_event_feed(container: Any, events: list[str]) -> None:
     )
 
 
-def _render_executive_audit_report(container: Any, results: list[dict]) -> None:
-    if not results:
-        return
-
-    worst_result = min(results, key=lambda result: result["trust_score"]["overall_score"])
-    cost_result = max(results, key=lambda result: result["audit_run"]["total_tokens"])
-    policies_violated = sorted(
-        {
-            "P001" if violation["violation_type"] == "PII" else "P002"
-            for result in results
-            for violation in result["policy_violations"]
-        }
-    )
-    if any(result["hallucination_findings"] for result in results):
-        policies_violated.append("P005")
-    if cost_result["audit_run"]["total_tokens"] >= 8000:
-        policies_violated.append("P004")
-
-    recommendations = [result["recommendation_cards"][0] for result in results if result["recommendation_cards"]]
-    recommended_action = recommendations[0]["suggested_action"] if recommendations else "Continue monitoring."
-    report = worst_result["executive_summary"]
-    confidence = _average_confidence(results)
-    cost_savings = _estimated_cost_savings(cost_result["audit_run"]["total_tokens"])
-
-    container.markdown(
-        (
-            '<div class="executive-audit-report">'
-            '<div class="control-room-panel-title">Executive Audit Report</div>'
-            '<div class="report-grid">'
-            '<div class="report-item"><div class="report-label">Trust Score</div>'
-            f'<div class="report-value">{worst_result["trust_score"]["overall_score"]}</div></div>'
-            '<div class="report-item report-risk"><div class="report-label">Risk Level</div>'
-            f'<div class="report-value">{status_badge(report["risk_level"], report["risk_level"].lower())}</div></div>'
-            '<div class="report-item"><div class="report-label">Policies Violated</div>'
-            f'<div class="report-value">{escape(", ".join(sorted(set(policies_violated))) or "None")}</div></div>'
-            '<div class="report-item"><div class="report-label">Business Impact</div>'
-            f'<div class="report-value">{escape(report["business_impact"])}</div></div>'
-            '<div class="report-item"><div class="report-label">Recommended Action</div>'
-            f'<div class="report-value">{escape(recommended_action)}</div></div>'
-            '<div class="report-item"><div class="report-label">Owner</div>'
-            f'<div class="report-value">{escape(report["recommended_owner"])}</div></div>'
-            '<div class="report-item"><div class="report-label">Estimated Cost Savings</div>'
-            f'<div class="report-value">{escape(cost_savings)}</div></div>'
-            '<div class="report-item"><div class="report-label">Confidence</div>'
-            f'<div class="report-value">{confidence}%</div></div>'
-            "</div>"
-            "</div>"
-        ),
-        unsafe_allow_html=True,
-    )
+def _response_frames(response: str) -> list[str]:
+    frame_count = 4
+    return [
+        response[: max(1, round(len(response) * index / frame_count))] + ("..." if index < frame_count else "")
+        for index in range(1, frame_count + 1)
+    ]
 
 
-def _events_for_step(step: str) -> list[str]:
-    if step == "Run Policy Engine":
-        return ["✓ Policy Passed for Procurement Agent.", "⚠ Financial Grounding requires source verification."]
-    if step == "Run PII Detection":
-        return ["🚨 PII Detected in HR Assistant response.", "⚠ Human Review Required for HR Assistant."]
-    if step == "Run Hallucination Detection":
-        return ["🚨 Hallucination Risk detected in Finance Copilot response."]
-    if step == "Run Cost Analysis":
-        return ["⚠ High Cost detected for Procurement Agent.", "✓ Cost Governance policy evaluated."]
-    if step == "Calculate Trust Score":
-        return ["Sentinel calculating Trust Score across all three Agents."]
-    if step == "Generate Recommendations":
-        return ["Sentinel generating remediation recommendations."]
-    return [f"✓ {step} complete."]
+def _events_for_step(step: str, scenario_key: str) -> list[str]:
+    agent_name = _agent_name(scenario_key)
+    if step == "Capturing Prompt":
+        return [f"{agent_name} prompt captured."]
+    if step == "Inspecting Response":
+        return [f"{agent_name} response inspected."]
+    if step == "Policy Engine":
+        return [_policy_engine_event(scenario_key)]
+    if step == "PII Detection":
+        return [policy_event_text("P001", failed=scenario_key == "hr_pii_leak")]
+    if step == "Hallucination Detection":
+        return (
+            ["Hallucination detected. Human Review required."]
+            if scenario_key == "finance_hallucination"
+            else ["Hallucination threshold passed."]
+        )
+    if step == "Cost Analysis":
+        return (
+            ["High token usage detected."]
+            if scenario_key == "procurement_high_tokens"
+            else ["Cost usage is within governance threshold."]
+        )
+    if step == "Trust Score Calculation":
+        return ["Sentinel calculating Trust Score."]
+    if step == "Recommendations":
+        return ["Recommendation engine preparing action plan."]
+    return [f"{step} complete."]
 
 
-def _events_for_results(results: list[dict]) -> list[str]:
-    events: list[str] = []
+def _policy_engine_event(scenario_key: str) -> str:
+    if scenario_key == "hr_pii_leak":
+        return policy_event_text("P001", failed=True)
+    if scenario_key == "finance_hallucination":
+        return policy_event_text("P002", failed=True)
+    if scenario_key == "procurement_high_tokens":
+        return policy_event_text("P004", failed=True)
+    return "Policy engine passed."
+
+
+def _append_event(events: list[dict[str, str]], message: str) -> None:
+    events.append(_event(message))
+
+
+def _event(message: str) -> dict[str, str]:
+    return {"time": datetime.now().strftime("%H:%M:%S"), "message": message}
+
+
+def _result_for_agent(results: list[dict], scenario_key: str) -> dict:
+    expected_agent_id = DEMO_SCENARIOS[scenario_key]["agent_id"]
     for result in results:
-        score = result["trust_score"]["overall_score"]
-        risk = result["executive_summary"]["risk_level"]
-        events.append(f"{result['audit_run']['agent_name']}: Trust Score {score}, Risk {risk}.")
-    return events
+        if result["audit_run"]["agent_id"] == expected_agent_id:
+            return result
+    return min(results, key=lambda result: result["trust_score"]["overall_score"])
+
+
+def _recommended_action(result: dict) -> str:
+    cards = result.get("recommendation_cards", [])
+    if not cards:
+        return "Continue monitoring."
+    return cards[0]["suggested_action"]
 
 
 def _agent_name(scenario_key: str) -> str:
     return DEMO_SCENARIOS[scenario_key]["agent_name"]
+
+
+def _business_unit(scenario_key: str) -> str:
+    for key, business_unit in AGENT_SEQUENCE:
+        if key == scenario_key:
+            return business_unit
+    return "Enterprise"
 
 
 def _average_confidence(results: list[dict]) -> int:

@@ -49,38 +49,38 @@ def render_sidebar() -> str:
     st.sidebar.markdown("---")
     st.sidebar.success("Demo Mode active")
     st.sidebar.caption("Ships with HR Assistant, Finance Copilot and Procurement Agent.")
-    st.sidebar.markdown(
-        """
-        <div class="sidebar-panel">
-            <div class="sidebar-panel-title">Demo Walkthrough</div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">1. Enterprise Live Control Room</div>
-                <div class="sidebar-step-text">Open with Sentinel monitoring multiple enterprise Agents in real time.</div>
+    with st.sidebar.expander("Demo Walkthrough", expanded=False):
+        st.markdown(
+            """
+            <div class="sidebar-walkthrough">
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">1. Enterprise Live Control Room</div>
+                    <div class="sidebar-step-text">Open with Sentinel monitoring multiple enterprise Agents in real time.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">2. Dashboard</div>
+                    <div class="sidebar-step-text">Show enterprise health, risks and latest Sentinel signals.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">3. Agent Catalogue</div>
+                    <div class="sidebar-step-text">Show the governed inventory of enterprise AI agents.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">4. Agent Details</div>
+                    <div class="sidebar-step-text">Drill into ownership, Trust Score and audit history.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">5. Live Agent Audit</div>
+                    <div class="sidebar-step-text">Run a focused Sentinel audit for one enterprise Agent.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">6. Analytics</div>
+                    <div class="sidebar-step-text">Close with trust, policy, cost and recommendation trends.</div>
+                </div>
             </div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">2. Dashboard</div>
-                <div class="sidebar-step-text">Show enterprise health, risks and latest Sentinel signals.</div>
-            </div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">3. Agent Catalogue</div>
-                <div class="sidebar-step-text">Show the governed inventory of enterprise AI agents.</div>
-            </div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">4. Agent Details</div>
-                <div class="sidebar-step-text">Drill into ownership, Trust Score and audit history.</div>
-            </div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">5. Live Agent Audit</div>
-                <div class="sidebar-step-text">Run a focused Sentinel audit for one enterprise Agent.</div>
-            </div>
-            <div class="sidebar-step">
-                <div class="sidebar-step-name">6. Analytics</div>
-                <div class="sidebar-step-text">Close with trust, policy, cost and recommendation trends.</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
     return page
 
 

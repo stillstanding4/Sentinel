@@ -4,27 +4,38 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from app.frontend.components.trust_scores import trust_score_state
+
 
 COLOR_SEQUENCE = ["#0f766e", "#2563eb", "#dc2626", "#9333ea", "#ea580c", "#475569"]
 
 
 def trust_score_gauge(score: int) -> go.Figure:
+    state = trust_score_state(score)
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number",
             value=score,
-            number={"font": {"size": 36}},
+            number={"font": {"size": 38, "color": state["color"]}},
             gauge={
                 "axis": {"range": [0, 100]},
-                "bar": {"color": "#0f766e"},
+                "bar": {"color": state["color"]},
                 "steps": [
                     {"range": [0, 59], "color": "#fee2e2"},
-                    {"range": [60, 79], "color": "#fef3c7"},
-                    {"range": [80, 100], "color": "#dcfce7"},
+                    {"range": [60, 74], "color": "#ffedd5"},
+                    {"range": [75, 89], "color": "#fef3c7"},
+                    {"range": [90, 100], "color": "#dcfce7"},
                 ],
                 "threshold": {"line": {"color": "#111827", "width": 3}, "value": score},
             },
         )
+    )
+    fig.add_annotation(
+        text=state["label"],
+        x=0.5,
+        y=0.08,
+        showarrow=False,
+        font={"size": 14, "color": state["color"]},
     )
     fig.update_layout(height=260, margin=dict(l=24, r=24, t=24, b=12))
     return fig

@@ -5,6 +5,7 @@ import streamlit as st
 from app.backend.services.analytics_service import AnalyticsService
 from app.frontend.components.charts import bar_chart, score_history
 from app.frontend.components.layout import page_header, section_divider
+from app.frontend.components.trust_scores import trust_score_state
 
 
 def render_analytics() -> None:
@@ -17,8 +18,9 @@ def render_analytics() -> None:
         "Governance, trust and optimization trends for enterprise AI operations.",
     )
 
+    enterprise_trust = trust_score_state(overview["enterprise_trust_score"])
     cols = st.columns(4)
-    cols[0].metric("Enterprise Trust Score", overview["enterprise_trust_score"])
+    cols[0].metric("Enterprise Trust Score", overview["enterprise_trust_score"], enterprise_trust["label"])
     cols[1].metric("Hallucination Rate", f"{overview['hallucination_rate']}%")
     cols[2].metric("PII Incidents", overview["pii_incidents"])
     cols[3].metric("Average Cost per Run", f"${overview['average_cost_per_run']:.4f}")

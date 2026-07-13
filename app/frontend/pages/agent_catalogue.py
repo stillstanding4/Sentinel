@@ -5,6 +5,7 @@ import streamlit as st
 from app.backend.services.agent_catalogue_service import AgentCatalogueService
 from app.frontend.components.layout import page_header, section_divider
 from app.frontend.components.tables import dataframe
+from app.frontend.components.trust_scores import trust_score_state
 
 
 def render_agent_catalogue() -> None:
@@ -26,6 +27,7 @@ def render_agent_catalogue() -> None:
             "Agent Type": agent["agent_type"],
             "Status": agent["status"],
             "Latest Trust Score": agent.get("latest_trust_score") or 0,
+            "Trust State": trust_score_state(agent.get("latest_trust_score") or 0)["label"],
             "Latest Policy Status": agent.get("latest_policy_status") or "PASS",
         }
         for agent in agents

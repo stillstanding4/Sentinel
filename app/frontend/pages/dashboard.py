@@ -10,15 +10,9 @@ from app.backend.repositories.recommendation_repository import RecommendationRep
 from app.frontend.components.charts import bar_chart, trust_score_gauge
 from app.frontend.components.layout import page_header, section_divider
 from app.frontend.components.metric_cards import metric_card, status_badge
+from app.frontend.components.policies import policy_id_for_finding, policy_violation_cards_html
 from app.frontend.components.tables import dataframe
-
-
-def trust_status(score: int) -> tuple[str, str]:
-    if score >= 80:
-        return "Trusted", "good"
-    if score >= 60:
-        return "Watch", "watch"
-    return "At Risk", "risk"
+from app.frontend.components.trust_scores import trust_score_state
 
 
 def render_dashboard() -> None:
@@ -31,10 +25,15 @@ def render_dashboard() -> None:
         eyebrow="AgentOps Control Tower",
     )
 
-    trust_label, trust_level = trust_status(analytics["enterprise_trust_score"])
+    enterprise_trust = trust_score_state(analytics["enterprise_trust_score"])
     cols = st.columns(6)
     with cols[0]:
-        metric_card("Enterprise Trust Score", str(analytics["enterprise_trust_score"]), trust_label, trust_level)
+        metric_card(
+            "Enterprise Trust Score",
+            str(analytics["enterprise_trust_score"]),
+            enterprise_trust["label"],
+            enterprise_trust["metric_status"],
+        )
     with cols[1]:
         metric_card("Hallucination Rate", f"{analytics['hallucination_rate']}%", "Unsupported claims", "watch")
     with cols[2]:
@@ -58,7 +57,7 @@ def render_dashboard() -> None:
         agent_rows = []
         for agent in analytics["agents"]:
             score = agent.get("latest_trust_score") or 0
-            status, _level = trust_status(score)
+            state = trust_score_state(score)
             agent_rows.append(
                 {
                     "Agent": agent["name"],
@@ -66,30 +65,31 @@ def render_dashboard() -> None:
                     "Business Unit": agent["business_unit"],
                     "Status": agent["status"],
                     "Trust Score": score,
-                    "Trust State": status,
+                    "Trust State": state["label"],
                     "Policy": agent.get("latest_policy_status") or "PASS",
                 }
             )
         dataframe(agent_rows)
 
-    section_divider("At-Risk Agents", "Agents below the trusted threshold require follow-up.")
+    section_divider("Governance Watchlist", "Agents below Trusted require follow-up.")
     if analytics["at_risk_agents"]:
         cols = st.columns(len(analytics["at_risk_agents"]))
         for index, agent in enumerate(analytics["at_risk_agents"]):
             with cols[index]:
                 score = agent.get("latest_trust_score") or 0
+                state = trust_score_state(score)
                 st.markdown(
                     f"""
-                    <div class="metric-card metric-risk">
+                    <div class="metric-card metric-{state['metric_status']}">
                       <div class="metric-label">{agent['business_unit']}</div>
                       <div class="metric-value">{agent['name']}</div>
-                      <div class="metric-detail">Trust Score {score} | {status_badge('At Risk', 'at-risk')}</div>
+                      <div class="metric-detail">Trust Score {score} | {status_badge(state['label'], state['status'])}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
     else:
-        st.success("No agents are currently at risk.")
+        st.success("No agents are currently below Trusted.")
 
     left, right = st.columns(2, gap="large")
     with left:
@@ -122,7 +122,7 @@ def _render_executive_summary(analytics: dict) -> None:
     critical_agents = [
         agent for agent in analytics.get("agents", []) if (agent.get("latest_trust_score") or 0) < 60
     ]
-    current_health = "Stable" if analytics["enterprise_trust_score"] >= 80 else "Needs Attention"
+    enterprise_trust = trust_score_state(analytics["enterprise_trust_score"])
     highest_business_risk = insights.get("most_critical_finding")
     cost_saving = insights.get("biggest_cost_saving_opportunity")
     latest_recommendation = insights.get("latest_recommendation")
@@ -131,9 +131,14 @@ def _render_executive_summary(analytics: dict) -> None:
     section_divider("Executive Summary", "Current enterprise posture and board-level operating signals.")
     cols = st.columns(6)
     with cols[0]:
-        metric_card("Current Enterprise Health", current_health, f"Trust Score {analytics['enterprise_trust_score']}", "good" if current_health == "Stable" else "watch")
+        metric_card(
+            "Current Enterprise Health",
+            enterprise_trust["label"],
+            f"Trust Score {analytics['enterprise_trust_score']}",
+            enterprise_trust["metric_status"],
+        )
     with cols[1]:
-        metric_card("Critical Agents", str(len(critical_agents)), "Trust Score below 60", "risk" if critical_agents else "good")
+        metric_card("Critical Agents", str(len(critical_agents)), "Trust Score below 60", "critical" if critical_agents else "good")
     with cols[2]:
         if highest_business_risk:
             metric_card("Highest Business Risk", highest_business_risk["agent_name"], highest_business_risk.get("description", "Governance finding"), "risk")
@@ -178,12 +183,17 @@ def _render_executive_signals(insights: dict) -> None:
     with cols[1]:
         if critical:
             severity = critical.get("severity", "high")
+            policy_html = (
+                policy_violation_cards_html([policy_id_for_finding(critical)], compact=True)
+                if critical.get("violation_type")
+                else ""
+            )
             st.markdown(
                 f"""
                 <div class="metric-card metric-risk">
                   <div class="metric-label">Most Critical Finding</div>
                   <div class="metric-value">{escape(critical['agent_name'])}</div>
-                  <div class="metric-detail">{status_badge(severity.title(), severity.lower())} {escape(critical.get('description', 'Governance finding detected.'))}</div>
+                  <div class="metric-detail">{policy_html or f"{status_badge(severity.title(), severity.lower())} {escape(critical.get('description', 'Governance finding detected.'))}"}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -193,7 +203,8 @@ def _render_executive_signals(insights: dict) -> None:
     with cols[2]:
         if highest_risk:
             score = highest_risk.get("latest_trust_score") or 0
-            metric_card("Highest Risk Agent", highest_risk["name"], f"Trust Score {score}", "risk" if score < 80 else "good")
+            state = trust_score_state(score)
+            metric_card("Highest Risk Agent", highest_risk["name"], f"Trust Score {score} | {state['label']}", state["metric_status"])
         else:
             metric_card("Highest Risk Agent", "None", "No agents available", "neutral")
     with cols[3]:
