@@ -985,6 +985,11 @@ def apply_enterprise_theme() -> None:
             padding: 16px 0;
             border-bottom: 1px solid #223047;
         }
+        .result-line-final {
+            padding-bottom: 24px;
+            border-bottom: 0;
+            margin-bottom: 6px;
+        }
         .result-line-value {
             color: #f8fafc;
             font-size: 16px;

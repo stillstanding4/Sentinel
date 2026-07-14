@@ -447,7 +447,6 @@ def _render_audit_result(container: Any, result: dict) -> None:
     summary = result["executive_summary"]
     policy_ids = infer_policy_ids_for_result(result)
     recommendation = _recommended_action(result)
-    confidence = _average_confidence([result])
     savings = _estimated_cost_saving_percent(audit_run.get("scenario_key"))
 
     container.markdown(
@@ -466,7 +465,6 @@ def _render_audit_result(container: Any, result: dict) -> None:
             f'{_result_line("Recommended Action", recommendation)}'
             f'{_result_line("Owner", summary["recommended_owner"])}'
             f'{_cost_saving_result_line(savings)}'
-            f'{_result_line("Confidence", f"{confidence}%")}'
             "</div>"
             "</div>"
         ),
@@ -510,7 +508,7 @@ def _result_line(label: str, value: str) -> str:
 
 def _cost_saving_result_line(value: str) -> str:
     return (
-        '<div class="result-line">'
+        '<div class="result-line result-line-final">'
         '<div class="result-line-label">Estimated Cost Saving (%)</div>'
         f'<div class="result-line-value">{escape(value)}</div>'
         '<div class="result-line-caption">Estimated reduction in LLM inference cost after applying Sentinel recommendations.</div>'
@@ -629,17 +627,6 @@ def _business_unit(scenario_key: str) -> str:
         if key == scenario_key:
             return business_unit
     return "Enterprise"
-
-
-def _average_confidence(results: list[dict]) -> int:
-    confidences = [
-        int(finding["confidence"] * 100)
-        for result in results
-        for finding in result["hallucination_findings"]
-    ]
-    if not confidences:
-        return 92
-    return round(sum(confidences) / len(confidences))
 
 
 def _estimated_cost_saving_percent(scenario_key: str | None) -> str:
