@@ -3,6 +3,8 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
+from app.utils.trust_score_model import SCENARIO_POLICY_FAILURES
+
 
 POLICY_ORDER = ("P001", "P002", "P003", "P004", "P005")
 
@@ -47,9 +49,6 @@ POLICY_LIBRARY = {
     },
 }
 
-DECISION_BUSINESS_UNITS = {"People Operations", "Finance", "Legal", "Procurement"}
-
-
 def policy_metadata(policy_id: str) -> dict[str, str]:
     return POLICY_LIBRARY.get(policy_id, {
         "id": policy_id,
@@ -63,16 +62,17 @@ def policy_metadata(policy_id: str) -> dict[str, str]:
 def infer_policy_ids_for_result(result: dict[str, Any]) -> list[str]:
     policy_ids: list[str] = []
     audit_run = result.get("audit_run") or {}
+    scenario_key = audit_run.get("scenario_key")
+
+    if scenario_key in SCENARIO_POLICY_FAILURES:
+        return _ordered_unique(list(SCENARIO_POLICY_FAILURES[scenario_key]))
 
     if result.get("policy_violations"):
         policy_ids.append("P001")
     if result.get("hallucination_findings"):
         policy_ids.append("P002")
-    if int(audit_run.get("total_tokens") or 0) >= 8000:
+    if int(audit_run.get("total_tokens") or 0) > 2500:
         policy_ids.append("P004")
-
-    if policy_ids and audit_run.get("business_unit") in DECISION_BUSINESS_UNITS:
-        policy_ids.append("P005")
 
     return _ordered_unique(policy_ids)
 

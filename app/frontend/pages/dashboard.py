@@ -2,228 +2,564 @@ from __future__ import annotations
 
 from html import escape
 
+import plotly.graph_objects as go
 import streamlit as st
 
-from app.backend.services.analytics_service import AnalyticsService
-from app.backend.services.audit_service import AuditService
-from app.backend.repositories.recommendation_repository import RecommendationRepository
-from app.frontend.components.charts import bar_chart, trust_score_gauge
-from app.frontend.components.layout import page_header, section_divider
-from app.frontend.components.metric_cards import metric_card, status_badge
-from app.frontend.components.policies import policy_id_for_finding, policy_violation_cards_html
-from app.frontend.components.tables import dataframe
-from app.frontend.components.trust_scores import trust_score_state
+
+KPI_CARDS = [
+    {
+        "icon": "▣",
+        "label": "Total Enterprise Agents",
+        "value": "48",
+        "trend": "↑ +6 this month",
+        "trend_state": "up",
+        "subtitle": "Registered across business units",
+        "accent": "blue",
+    },
+    {
+        "icon": "✓",
+        "label": "Active Agents",
+        "value": "32",
+        "trend": "↑ +5%",
+        "trend_state": "up",
+        "subtitle": "Currently monitored by Sentinel",
+        "accent": "green",
+    },
+    {
+        "icon": "◇",
+        "label": "Trust Score",
+        "value": "86",
+        "trend": "↑ +2",
+        "trend_state": "up",
+        "subtitle": "Enterprise governance score",
+        "accent": "blue",
+    },
+    {
+        "icon": "!",
+        "label": "Policy Violations",
+        "value": "7",
+        "trend": "↓ -18%",
+        "trend_state": "down-good",
+        "subtitle": "Open and recent findings",
+        "accent": "red",
+    },
+    {
+        "icon": "$",
+        "label": "Business Value Protected",
+        "value": "$2.1M",
+        "trend": "↑ Estimated annual savings",
+        "trend_state": "up",
+        "subtitle": "Risk and cost exposure avoided",
+        "accent": "green",
+    },
+]
+
+AGENT_DISTRIBUTION = {
+    "Finance": 12,
+    "HR": 9,
+    "Procurement": 8,
+    "Legal": 7,
+    "Operations": 6,
+    "Customer Service": 6,
+}
+
+MONTHLY_ACTIVITY = {
+    "Jan": 18,
+    "Feb": 27,
+    "Mar": 31,
+    "Apr": 44,
+    "May": 41,
+    "Jun": 48,
+}
+
+TOP_PERFORMING_AGENTS = [
+    {"agent": "Finance Copilot", "business_unit": "Finance", "trust_score": "92", "status": "Healthy", "last_audit": "2 mins ago"},
+    {"agent": "HR Assistant", "business_unit": "People Operations", "trust_score": "74", "status": "Needs Review", "last_audit": "12 mins ago"},
+    {"agent": "Procurement Agent", "business_unit": "Procurement", "trust_score": "86", "status": "Healthy", "last_audit": "5 mins ago"},
+]
+
+HIGHEST_RISK_AGENTS = [
+    {"agent": "HR Assistant", "risk": "Critical", "policy": "P001", "impact": "PII Exposure"},
+    {"agent": "Finance Copilot", "risk": "Medium", "policy": "P002", "impact": "Financial Claim"},
+    {"agent": "Procurement Agent", "risk": "Medium", "policy": "P005", "impact": "Human Approval"},
+]
+
+GOVERNANCE_WATCHLIST = [
+    {"time": "11:42", "agent": "HR Assistant", "policy": "P001", "severity": "Critical", "recommendation": "Mask employee SSN", "status": "Open"},
+    {"time": "11:40", "agent": "Finance Copilot", "policy": "P002", "severity": "Medium", "recommendation": "Add evidence", "status": "In Progress"},
+    {"time": "11:36", "agent": "Procurement", "policy": "P005", "severity": "Low", "recommendation": "Human approval", "status": "Resolved"},
+]
+
+CHART_COLORS = ["#2563EB", "#22C55E", "#14B8A6", "#8B5CF6", "#F59E0B", "#64748B"]
 
 
 def render_dashboard() -> None:
-    analytics = AnalyticsService().overview()
-    recommendations = RecommendationRepository().list_recommendations()
+    _inject_dashboard_styles()
+    _render_header()
+    _render_kpis()
 
-    page_header(
-        "Sentinel - Agent of Agents",
-        "Observe. Audit. Trust. Optimize.",
-        eyebrow="AgentOps Control Tower",
+    chart_left, chart_right = st.columns(2, gap="large")
+    with chart_left:
+        st.plotly_chart(_agent_distribution_chart(), use_container_width=True)
+    with chart_right:
+        st.plotly_chart(_activity_trend_chart(), use_container_width=True)
+
+    table_left, table_right = st.columns(2, gap="large")
+    with table_left:
+        _render_top_performing_agents()
+    with table_right:
+        _render_highest_risk_agents()
+
+    _render_governance_watchlist()
+
+
+def _render_header() -> None:
+    st.markdown(
+        """
+        <div class="dash-header">
+            <div class="dash-title">Sentinel - Agent of Agents</div>
+            <div class="dash-subtitle">Enterprise Governance &amp; Trust Platform for AI Agents</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    enterprise_trust = trust_score_state(analytics["enterprise_trust_score"])
-    cols = st.columns(6)
-    with cols[0]:
-        metric_card(
-            "Enterprise Trust Score",
-            str(analytics["enterprise_trust_score"]),
-            enterprise_trust["label"],
-            enterprise_trust["metric_status"],
+
+def _render_kpis() -> None:
+    cards = "".join(_kpi_card_html(card) for card in KPI_CARDS)
+    st.markdown(f'<div class="dash-kpi-grid">{cards}</div>', unsafe_allow_html=True)
+
+
+def _kpi_card_html(card: dict[str, str]) -> str:
+    trend_class = f"dash-trend-{card['trend_state']}"
+    return (
+        f'<div class="dash-kpi-card dash-kpi-{escape(card["accent"])}">'
+        '<div class="dash-kpi-top">'
+        f'<div class="dash-kpi-icon">{escape(card["icon"])}</div>'
+        f'<div class="dash-kpi-label">{escape(card["label"])}</div>'
+        "</div>"
+        f'<div class="dash-kpi-value">{escape(card["value"])}</div>'
+        f'<div class="dash-kpi-trend {trend_class}">{escape(card["trend"])}</div>'
+        f'<div class="dash-kpi-subtitle">{escape(card["subtitle"])}</div>'
+        "</div>"
+    )
+
+
+def _agent_distribution_chart() -> go.Figure:
+    labels = list(AGENT_DISTRIBUTION.keys())
+    values = list(AGENT_DISTRIBUTION.values())
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.64,
+                domain={"x": [0.02, 0.68], "y": [0.02, 0.98]},
+                marker={"colors": CHART_COLORS, "line": {"color": "#FFFFFF", "width": 3}},
+                textinfo="none",
+                hovertemplate="%{label}: %{value} agents<extra></extra>",
+            )
+        ]
+    )
+    fig.update_layout(
+        title={"text": "Enterprise AI Agent Distribution", "x": 0.02, "xanchor": "left"},
+        height=360,
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        margin={"l": 8, "r": 8, "t": 64, "b": 8},
+        legend={
+            "orientation": "v",
+            "x": 0.76,
+            "y": 0.5,
+            "xanchor": "left",
+            "yanchor": "middle",
+            "font": {"size": 12, "color": "#334155"},
+        },
+        font={"family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", "color": "#0F172A"},
+        annotations=[
+            {
+                "text": "<b>48</b>",
+                "x": 0.35,
+                "y": 0.535,
+                "xref": "paper",
+                "yref": "paper",
+                "font": {"size": 30, "color": "#0F172A"},
+                "showarrow": False,
+            },
+            {
+                "text": "Enterprise Agents",
+                "x": 0.35,
+                "y": 0.455,
+                "xref": "paper",
+                "yref": "paper",
+                "font": {"size": 14, "color": "#64748B"},
+                "showarrow": False,
+            }
+        ],
+    )
+    return fig
+
+
+def _activity_trend_chart() -> go.Figure:
+    months = list(MONTHLY_ACTIVITY.keys())
+    values = list(MONTHLY_ACTIVITY.values())
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=months,
+            y=values,
+            mode="lines+markers",
+            line={"color": "#2563EB", "width": 3},
+            marker={"size": 8, "color": "#2563EB", "line": {"color": "#FFFFFF", "width": 2}},
+            fill="tozeroy",
+            fillcolor="rgba(37, 99, 235, 0.12)",
+            hovertemplate="%{x}: %{y} active agents<extra></extra>",
         )
-    with cols[1]:
-        metric_card("Hallucination Rate", f"{analytics['hallucination_rate']}%", "Unsupported claims", "watch")
-    with cols[2]:
-        metric_card("PII Incidents", str(analytics["pii_incidents"]), "Policy & PII violations", "risk")
-    with cols[3]:
-        metric_card("Average Cost per Run", f"${analytics['average_cost_per_run']:.4f}", "Operational cost", "neutral")
-    with cols[4]:
-        metric_card("Policy Violations", str(analytics["policy_violations"]), "Governance events", "risk")
-    with cols[5]:
-        metric_card("Agent Reuse", str(analytics["agent_reuse"]), "Captured runs", "good")
+    )
+    fig.update_layout(
+        title={"text": "Enterprise Agent Activity Trend", "x": 0.02, "xanchor": "left"},
+        height=340,
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        margin={"l": 38, "r": 22, "t": 72, "b": 42},
+        xaxis={"showgrid": False, "linecolor": "#E2E8F0", "tickfont": {"color": "#334155"}},
+        yaxis={
+            "title": {"text": "Active Agents", "font": {"size": 12, "color": "#475569"}},
+            "gridcolor": "#E2E8F0",
+            "zeroline": False,
+            "tickfont": {"color": "#334155"},
+        },
+        font={"family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", "color": "#0F172A"},
+        showlegend=False,
+    )
+    return fig
 
-    _render_executive_summary(analytics)
-    _render_executive_signals(analytics["executive_insights"])
 
-    left, right = st.columns([0.42, 0.58], gap="large")
-    with left:
-        section_divider("Trust Score Engine", "Centralized governance score across observed Agents.")
-        st.plotly_chart(trust_score_gauge(analytics["enterprise_trust_score"]), use_container_width=True)
-    with right:
-        section_divider("Agent Catalogue Snapshot", "Ownership, business unit and latest governance status.")
-        agent_rows = []
-        for agent in analytics["agents"]:
-            score = agent.get("latest_trust_score") or 0
-            state = trust_score_state(score)
-            agent_rows.append(
-                {
-                    "Agent": agent["name"],
-                    "Owner": agent["owner_name"],
-                    "Business Unit": agent["business_unit"],
-                    "Status": agent["status"],
-                    "Trust Score": score,
-                    "Trust State": state["label"],
-                    "Policy": agent.get("latest_policy_status") or "PASS",
-                }
-            )
-        dataframe(agent_rows)
-
-    section_divider("Governance Watchlist", "Agents below Trusted require follow-up.")
-    if analytics["at_risk_agents"]:
-        cols = st.columns(len(analytics["at_risk_agents"]))
-        for index, agent in enumerate(analytics["at_risk_agents"]):
-            with cols[index]:
-                score = agent.get("latest_trust_score") or 0
-                state = trust_score_state(score)
-                st.markdown(
-                    f"""
-                    <div class="metric-card metric-{state['metric_status']}">
-                      <div class="metric-label">{agent['business_unit']}</div>
-                      <div class="metric-value">{agent['name']}</div>
-                      <div class="metric-detail">Trust Score {score} | {status_badge(state['label'], state['status'])}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-    else:
-        st.success("No agents are currently below Trusted.")
-
-    left, right = st.columns(2, gap="large")
-    with left:
-        section_divider("Live Agent Audit Results")
-        recent = AuditService().list_recent_audit_runs(8)
-        dataframe(
-            [
-                {
-                    "Agent": run["agent_name"],
-                    "Scenario": run.get("scenario_key") or "manual",
-                    "Tokens": run["total_tokens"],
-                    "Cost": f"${run['estimated_cost']:.4f}",
-                    "Status": run["status"],
-                }
-                for run in recent
-            ]
+def _render_top_performing_agents() -> None:
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td>{escape(row['agent'])}</td>"
+            f"<td>{escape(row['business_unit'])}</td>"
+            f"<td><strong>{escape(row['trust_score'])}</strong></td>"
+            f"<td>{_badge(row['status'], _status_state(row['status']))}</td>"
+            f"<td>{escape(row['last_audit'])}</td>"
+            "</tr>"
         )
-    with right:
-        section_divider("Recommendation Engine")
-        recommendation_counts: dict[str, int] = {}
-        for recommendation in recommendations:
-            recommendation_counts[recommendation["recommendation_type"]] = (
-                recommendation_counts.get(recommendation["recommendation_type"], 0) + 1
-            )
-        st.plotly_chart(bar_chart(recommendation_counts, "Recommendations by Type"), use_container_width=True)
+        for row in TOP_PERFORMING_AGENTS
+    )
+    _render_table_card(
+        "Top Performing Agents",
+        "Highest trust and operational readiness",
+        ["Agent", "Business Unit", "Trust Score", "Status", "Last Audit"],
+        rows,
+    )
 
 
-def _render_executive_summary(analytics: dict) -> None:
-    insights = analytics.get("executive_insights", {})
-    critical_agents = [
-        agent for agent in analytics.get("agents", []) if (agent.get("latest_trust_score") or 0) < 60
-    ]
-    enterprise_trust = trust_score_state(analytics["enterprise_trust_score"])
-    highest_business_risk = insights.get("most_critical_finding")
-    cost_saving = insights.get("biggest_cost_saving_opportunity")
-    latest_recommendation = insights.get("latest_recommendation")
-    latest_audit = insights.get("most_recent_audit")
-
-    section_divider("Executive Summary", "Current enterprise posture and board-level operating signals.")
-    cols = st.columns(6)
-    with cols[0]:
-        metric_card(
-            "Current Enterprise Health",
-            enterprise_trust["label"],
-            f"Trust Score {analytics['enterprise_trust_score']}",
-            enterprise_trust["metric_status"],
+def _render_highest_risk_agents() -> None:
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td>{escape(row['agent'])}</td>"
+            f"<td>{_badge(row['risk'], _risk_state(row['risk']))}</td>"
+            f"<td><span class=\"dash-policy-pill\">{escape(row['policy'])}</span></td>"
+            f"<td>{escape(row['impact'])}</td>"
+            "</tr>"
         )
-    with cols[1]:
-        metric_card("Critical Agents", str(len(critical_agents)), "Trust Score below 60", "critical" if critical_agents else "good")
-    with cols[2]:
-        if highest_business_risk:
-            metric_card("Highest Business Risk", highest_business_risk["agent_name"], highest_business_risk.get("description", "Governance finding"), "risk")
-        else:
-            metric_card("Highest Business Risk", "None", "No active critical finding", "good")
-    with cols[3]:
-        if cost_saving:
-            metric_card("Biggest Cost Saving Opportunity", cost_saving["agent_name"], f"{cost_saving['total_tokens']:,} tokens", "watch")
-        else:
-            metric_card("Biggest Cost Saving Opportunity", "None", "No runs captured", "neutral")
-    with cols[4]:
-        if latest_recommendation:
-            metric_card("Latest Recommendation", latest_recommendation["agent_name"], latest_recommendation["title"], "watch")
-        else:
-            metric_card("Latest Recommendation", "None", "No recommendations", "neutral")
-    with cols[5]:
-        if latest_audit:
-            metric_card("Latest Audit Time", latest_audit.get("completed_at") or "Running", latest_audit["agent_name"], "neutral")
-        else:
-            metric_card("Latest Audit Time", "None", "No AuditRun captured", "neutral")
+        for row in HIGHEST_RISK_AGENTS
+    )
+    _render_table_card(
+        "Highest Risk Agents",
+        "Priority risk signals requiring executive awareness",
+        ["Agent", "Risk", "Policy Failed", "Business Impact"],
+        rows,
+    )
 
 
-def _render_executive_signals(insights: dict) -> None:
-    section_divider("Executive Signals", "Most recent operational facts from Sentinel.")
-    most_recent = insights.get("most_recent_audit")
-    critical = insights.get("most_critical_finding")
-    highest_risk = insights.get("highest_risk_agent")
-    cost_saving = insights.get("biggest_cost_saving_opportunity")
-    latest_recommendation = insights.get("latest_recommendation")
+def _render_governance_watchlist() -> None:
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td>{escape(row['time'])}</td>"
+            f"<td>{escape(row['agent'])}</td>"
+            f"<td><span class=\"dash-policy-pill\">{escape(row['policy'])}</span></td>"
+            f"<td>{_badge(row['severity'], _risk_state(row['severity']))}</td>"
+            f"<td>{escape(row['recommendation'])}</td>"
+            f"<td>{_badge(row['status'], _status_state(row['status']))}</td>"
+            "</tr>"
+        )
+        for row in GOVERNANCE_WATCHLIST
+    )
+    _render_table_card(
+        "Governance Watchlist",
+        "Agents and policy actions requiring follow-up",
+        ["Time", "Agent", "Policy", "Severity", "Recommendation", "Status"],
+        rows,
+        full_width=True,
+    )
 
-    cols = st.columns(5)
-    with cols[0]:
-        if most_recent:
-            metric_card(
-                "Most Recent Audit",
-                most_recent["agent_name"],
-                most_recent.get("scenario_key") or "manual",
-                "neutral",
-            )
-        else:
-            metric_card("Most Recent Audit", "None", "No AuditRun captured", "neutral")
-    with cols[1]:
-        if critical:
-            severity = critical.get("severity", "high")
-            policy_html = (
-                policy_violation_cards_html([policy_id_for_finding(critical)], compact=True)
-                if critical.get("violation_type")
-                else ""
-            )
-            st.markdown(
-                f"""
-                <div class="metric-card metric-risk">
-                  <div class="metric-label">Most Critical Finding</div>
-                  <div class="metric-value">{escape(critical['agent_name'])}</div>
-                  <div class="metric-detail">{policy_html or f"{status_badge(severity.title(), severity.lower())} {escape(critical.get('description', 'Governance finding detected.'))}"}</div>
+
+def _render_table_card(
+    title: str,
+    subtitle: str,
+    headers: list[str],
+    rows: str,
+    full_width: bool = False,
+) -> None:
+    header_html = "".join(f"<th>{escape(header)}</th>" for header in headers)
+    modifier = " dash-table-card-full" if full_width else ""
+    st.markdown(
+        f"""
+        <div class="dash-table-card{modifier}">
+            <div class="dash-card-heading">
+                <div>
+                    <div class="dash-card-title">{escape(title)}</div>
+                    <div class="dash-card-subtitle">{escape(subtitle)}</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            metric_card("Most Critical Finding", "None", "No active findings", "good")
-    with cols[2]:
-        if highest_risk:
-            score = highest_risk.get("latest_trust_score") or 0
-            state = trust_score_state(score)
-            metric_card("Highest Risk Agent", highest_risk["name"], f"Trust Score {score} | {state['label']}", state["metric_status"])
-        else:
-            metric_card("Highest Risk Agent", "None", "No agents available", "neutral")
-    with cols[3]:
-        if cost_saving:
-            metric_card(
-                "Biggest Cost Saving Opportunity",
-                cost_saving["agent_name"],
-                f"{cost_saving['total_tokens']:,} tokens",
-                "watch" if cost_saving["total_tokens"] >= 8000 else "good",
-            )
-        else:
-            metric_card("Biggest Cost Saving Opportunity", "None", "No AuditRun captured", "neutral")
-    with cols[4]:
-        if latest_recommendation:
-            metric_card(
-                "Latest Recommendation",
-                latest_recommendation["agent_name"],
-                latest_recommendation["title"],
-                "risk" if latest_recommendation["severity"] in {"critical", "high"} else "watch",
-            )
-        else:
-            metric_card("Latest Recommendation", "None", "No recommendations", "neutral")
+            </div>
+            <table class="dash-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _badge(label: str, state: str) -> str:
+    return f'<span class="dash-badge dash-badge-{escape(state)}">{escape(label)}</span>'
+
+
+def _risk_state(label: str) -> str:
+    normalized = label.lower()
+    if normalized in {"critical", "high"}:
+        return "critical"
+    if normalized in {"medium", "needs review", "in progress"}:
+        return "warning"
+    return "success"
+
+
+def _status_state(label: str) -> str:
+    normalized = label.lower()
+    if normalized in {"healthy", "resolved"}:
+        return "success"
+    if normalized in {"needs review", "in progress"}:
+        return "warning"
+    if normalized in {"open", "critical"}:
+        return "critical"
+    return "neutral"
+
+
+def _inject_dashboard_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 1480px;
+            padding-top: 1.6rem;
+        }
+        .dash-header {
+            padding: 8px 0 24px;
+            max-width: 980px;
+        }
+        .dash-title {
+            color: #0F172A;
+            font-size: 34px;
+            line-height: 1.12;
+            font-weight: 800;
+        }
+        .dash-subtitle {
+            color: #475569;
+            font-size: 16px;
+            line-height: 1.45;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .dash-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 18px;
+            margin: 6px 0 22px;
+        }
+        .dash-kpi-card {
+            background: #FFFFFF;
+            border: 1px solid #E5EAF1;
+            border-radius: 16px;
+            padding: 22px;
+            min-height: 170px;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.065);
+        }
+        .dash-kpi-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .dash-kpi-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 900;
+            background: #EFF6FF;
+            color: #2563EB;
+        }
+        .dash-kpi-green .dash-kpi-icon {
+            background: #ECFDF5;
+            color: #22C55E;
+        }
+        .dash-kpi-red .dash-kpi-icon {
+            background: #FEF2F2;
+            color: #EF4444;
+        }
+        .dash-kpi-label {
+            color: #334155;
+            font-size: 13px;
+            font-weight: 760;
+            line-height: 1.25;
+        }
+        .dash-kpi-value {
+            color: #0F172A;
+            font-size: 36px;
+            line-height: 1;
+            font-weight: 820;
+            margin-top: 20px;
+        }
+        .dash-kpi-trend {
+            font-size: 13px;
+            font-weight: 760;
+            margin-top: 14px;
+        }
+        .dash-trend-up,
+        .dash-trend-down-good {
+            color: #16A34A;
+        }
+        .dash-trend-down {
+            color: #EF4444;
+        }
+        .dash-kpi-subtitle {
+            color: #64748B;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        div[data-testid="stPlotlyChart"] {
+            background: #FFFFFF;
+            border: 1px solid #E5EAF1;
+            border-radius: 16px;
+            padding: 10px 12px 4px;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.065);
+        }
+        .dash-table-card {
+            background: #FFFFFF;
+            border: 1px solid #E5EAF1;
+            border-radius: 16px;
+            padding: 22px;
+            margin-top: 18px;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.065);
+        }
+        .dash-table-card-full {
+            margin-top: 22px;
+        }
+        .dash-card-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .dash-card-title {
+            color: #0F172A;
+            font-size: 17px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+        .dash-card-subtitle {
+            color: #64748B;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .dash-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .dash-table th {
+            color: #64748B;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            text-align: left;
+            padding: 11px 10px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .dash-table td {
+            color: #0F172A;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 13px 10px;
+            border-bottom: 1px solid #EDF2F7;
+            vertical-align: middle;
+        }
+        .dash-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+        .dash-badge,
+        .dash-policy-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .dash-policy-pill {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            border: 1px solid #DBEAFE;
+        }
+        .dash-badge-success {
+            background: #DCFCE7;
+            color: #166534;
+        }
+        .dash-badge-warning {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        .dash-badge-critical {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+        .dash-badge-neutral {
+            background: #F1F5F9;
+            color: #334155;
+        }
+        @media (max-width: 1180px) {
+            .dash-kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 720px) {
+            .dash-title {
+                font-size: 28px;
+            }
+            .dash-kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            .dash-table-card {
+                overflow-x: auto;
+            }
+            .dash-table {
+                min-width: 620px;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )

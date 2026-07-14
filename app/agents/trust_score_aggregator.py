@@ -3,38 +3,32 @@ from __future__ import annotations
 from app.agents.state import AuditWorkflowState
 from app.utils.ids import new_id
 from app.utils.time import utc_now_iso
+from app.utils.trust_score_model import calculate_trust_score_from_state
 
 
 def calculate_trust_score(state: AuditWorkflowState) -> AuditWorkflowState:
-    policy_violations = state.get("policy_violations", [])
-    hallucination_findings = state.get("hallucination_findings", [])
-    cost_analysis = state.get("cost_analysis", {})
-    feedback_signals = state.get("feedback_signals", {})
-
-    policy_score = 30 if policy_violations else 96
-    hallucination_score = 48 if hallucination_findings else 96
-    cost_score = 54 if cost_analysis.get("is_high_usage") else 94
-    feedback_score = int(feedback_signals.get("score", 86))
-
-    overall = round(
-        (policy_score * 0.35)
-        + (hallucination_score * 0.25)
-        + (cost_score * 0.20)
-        + (feedback_score * 0.20)
-    )
+    components = calculate_trust_score_from_state(state)
+    state["review_status"] = components.review_status_label
+    state["trust_score_breakdown"] = {
+        "policies_passed": components.policies_passed,
+        "total_policies": components.total_policies,
+        "hallucination_check_passed": components.hallucination_check_passed,
+        "pii_check_passed": components.pii_check_passed,
+        "review_status": components.review_status_label,
+    }
 
     state["trust_score"] = {
         "id": new_id("trust"),
         "agent_id": state["agent_id"],
         "audit_run_id": state["audit_run_id"],
-        "overall_score": overall,
-        "hallucination_score": hallucination_score,
-        "policy_score": policy_score,
-        "cost_score": cost_score,
-        "feedback_score": feedback_score,
+        "overall_score": components.overall_score,
+        "hallucination_score": components.safety,
+        "policy_score": components.policy_compliance,
+        "cost_score": components.cost_efficiency,
+        "feedback_score": components.review_status,
         "calculation_notes": (
-            "Trust Score Engine combined Hallucination Evaluator, Policy Evaluator, "
-            "Cost Optimizer and Feedback Loop signals."
+            "Trust Score = 40% Policy Compliance + 30% Safety + "
+            "20% Cost Efficiency + 10% Review Status."
         ),
         "created_at": utc_now_iso(),
     }

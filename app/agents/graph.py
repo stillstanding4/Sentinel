@@ -16,7 +16,7 @@ WORKFLOW_STEPS = [
     ("Cost Analysis", evaluate_cost),
     ("Trust Score", calculate_trust_score),
     ("Recommendations", generate_recommendations),
-    ("Human Feedback", apply_feedback_signals),
+    ("Review Status", apply_feedback_signals),
     ("Dashboard Updated", lambda state: state),
 ]
 

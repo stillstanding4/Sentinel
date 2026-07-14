@@ -4,7 +4,7 @@ from app.agents.state import AuditWorkflowState
 from app.utils.token_costs import estimate_cost
 
 
-HIGH_TOKEN_THRESHOLD = 8000
+ELEVATED_TOKEN_THRESHOLD = 1500
 
 
 def evaluate_cost(state: AuditWorkflowState) -> AuditWorkflowState:
@@ -12,7 +12,7 @@ def evaluate_cost(state: AuditWorkflowState) -> AuditWorkflowState:
     completion_tokens = int(state.get("completion_tokens", 0))
     total_tokens = prompt_tokens + completion_tokens
     estimated_cost = estimate_cost(prompt_tokens, completion_tokens)
-    is_high_usage = total_tokens >= HIGH_TOKEN_THRESHOLD
+    is_high_usage = total_tokens >= ELEVATED_TOKEN_THRESHOLD
 
     state["prompt_tokens"] = prompt_tokens
     state["completion_tokens"] = completion_tokens
@@ -24,7 +24,7 @@ def evaluate_cost(state: AuditWorkflowState) -> AuditWorkflowState:
         "status": "Cost Optimization" if is_high_usage else "Efficient",
         "is_high_usage": is_high_usage,
         "description": (
-            "High token usage detected. Reduce duplicated context and summarize supplier evidence."
+            "Elevated token usage detected. Reduce duplicated context and summarize supplier evidence."
             if is_high_usage
             else "Token usage is within the expected operating range."
         ),

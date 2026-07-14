@@ -694,6 +694,197 @@ def apply_enterprise_theme() -> None:
         .audit-result-card .policy-empty {
             color: #94a3b8;
         }
+        .framework-policy-table {
+            display: grid;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .framework-policy-row {
+            display: grid;
+            grid-template-columns: 86px 1fr;
+            gap: 18px;
+            align-items: start;
+            background: #ffffff;
+            border: 1px solid var(--sentinel-line);
+            border-radius: 8px;
+            padding: 18px 20px;
+            box-shadow: var(--sentinel-soft-shadow);
+        }
+        .framework-policy-id {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            border-radius: 8px;
+            background: #eef6ff;
+            color: var(--sentinel-blue);
+            font-size: 14px;
+            font-weight: 800;
+        }
+        .framework-policy-name {
+            color: var(--sentinel-ink);
+            font-size: 17px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+        .framework-policy-description {
+            color: var(--sentinel-muted);
+            font-size: 14px;
+            line-height: 1.55;
+            margin-top: 6px;
+        }
+        .framework-policy-items {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+            list-style: none;
+            padding: 0;
+            margin: 12px 0 0;
+        }
+        .framework-policy-items li {
+            background: #f8fafc;
+            border: 1px solid #e6edf5;
+            border-radius: 999px;
+            color: var(--sentinel-ink);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 7px 9px;
+            text-align: center;
+        }
+        .formula-card {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 12px 0 16px;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        }
+        .formula-card-compact {
+            margin: 18px 0 0;
+            padding: 18px;
+        }
+        .formula-title {
+            color: #7dd3fc;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .formula-expression {
+            color: #ffffff;
+            font-size: 22px;
+            line-height: 1.45;
+            font-weight: 800;
+        }
+        .score-weight-grid,
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 14px;
+        }
+        .score-weight-card,
+        .component-card,
+        .example-card {
+            background: #ffffff;
+            border: 1px solid var(--sentinel-line);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--sentinel-soft-shadow);
+        }
+        .score-weight-value {
+            color: var(--sentinel-teal);
+            font-size: 32px;
+            line-height: 1;
+            font-weight: 800;
+        }
+        .score-weight-name,
+        .component-title {
+            color: var(--sentinel-ink);
+            font-size: 16px;
+            font-weight: 800;
+            margin-top: 10px;
+        }
+        .score-weight-detail,
+        .component-body {
+            color: var(--sentinel-muted);
+            font-size: 13px;
+            line-height: 1.5;
+            margin-top: 7px;
+        }
+        .component-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            background: #eef6ff;
+            color: var(--sentinel-blue);
+            font-size: 17px;
+            font-weight: 800;
+        }
+        .component-example {
+            background: #f8fafc;
+            border-left: 3px solid var(--sentinel-teal);
+            color: var(--sentinel-ink);
+            font-size: 13px;
+            line-height: 1.5;
+            margin-top: 14px;
+            padding: 10px 12px;
+        }
+        .example-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .example-eyebrow {
+            color: var(--sentinel-teal);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .example-title {
+            color: var(--sentinel-ink);
+            font-size: 30px;
+            line-height: 1.15;
+            font-weight: 800;
+            margin-top: 4px;
+        }
+        .example-score {
+            color: var(--sentinel-green);
+            font-size: 38px;
+            line-height: 1;
+            font-weight: 800;
+        }
+        .example-breakdown {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .example-breakdown div {
+            background: #f8fafc;
+            border: 1px solid #e6edf5;
+            border-radius: 8px;
+            padding: 13px;
+        }
+        .example-breakdown span {
+            display: block;
+            color: var(--sentinel-muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .example-breakdown strong {
+            display: block;
+            color: var(--sentinel-ink);
+            font-size: 22px;
+            font-weight: 800;
+            margin-top: 5px;
+        }
         .audit-result-hero {
             display: flex;
             align-items: flex-start;
@@ -747,6 +938,48 @@ def apply_enterprise_theme() -> None:
         }
         .result-detail-stack {
             margin-top: 24px;
+        }
+        .result-breakdown {
+            background: rgba(255, 255, 255, 0.045);
+            border: 1px solid #26364d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+        .result-breakdown-title {
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .result-breakdown-row {
+            display: grid;
+            grid-template-columns: 132px 1fr 58px;
+            align-items: center;
+            gap: 10px;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 720;
+            margin-top: 9px;
+        }
+        .result-breakdown-bar {
+            height: 7px;
+            border-radius: 999px;
+            background: #1e293b;
+            overflow: hidden;
+        }
+        .result-breakdown-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: #2dd4bf;
+        }
+        .result-breakdown-final {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 800;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #26364d;
         }
         .result-line {
             padding: 16px 0;
@@ -803,6 +1036,14 @@ def apply_enterprise_theme() -> None:
             .policy-alert-grid {
                 grid-template-columns: 1fr;
             }
+            .score-weight-grid,
+            .component-grid,
+            .example-breakdown {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .framework-policy-items {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
         @media (max-width: 760px) {
             .agent-focus-card,
@@ -824,6 +1065,16 @@ def apply_enterprise_theme() -> None:
             }
             .page-title {
                 font-size: 30px;
+            }
+            .framework-policy-row,
+            .score-weight-grid,
+            .component-grid,
+            .example-breakdown,
+            .framework-policy-items {
+                grid-template-columns: 1fr;
+            }
+            .formula-expression {
+                font-size: 18px;
             }
         }
         </style>

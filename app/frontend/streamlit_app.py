@@ -12,11 +12,9 @@ import streamlit as st
 from app.backend.core.config import settings
 from app.backend.services.bootstrap_service import bootstrap_application
 from app.frontend.pages.agent_catalogue import render_agent_catalogue
-from app.frontend.pages.agent_details import render_agent_details
-from app.frontend.pages.analytics import render_analytics
 from app.frontend.pages.dashboard import render_dashboard
 from app.frontend.pages.enterprise_live_control_room import render_enterprise_live_control_room
-from app.frontend.pages.live_audit import render_live_audit
+from app.frontend.pages.governance_framework import render_governance_framework
 from app.frontend.state.session_state import ensure_state
 from app.frontend.styles import apply_enterprise_theme
 
@@ -25,9 +23,7 @@ PAGES = {
     "Enterprise Live Control Room": render_enterprise_live_control_room,
     "Dashboard": render_dashboard,
     "Agent Catalogue": render_agent_catalogue,
-    "Agent Details": render_agent_details,
-    "Live Audit": render_live_audit,
-    "Analytics": render_analytics,
+    "📚 Governance Framework": render_governance_framework,
 }
 
 
@@ -41,9 +37,12 @@ def render_sidebar() -> str:
     st.sidebar.markdown("## Sentinel")
     st.sidebar.caption(settings.tagline)
     st.sidebar.markdown("---")
+    available_pages = list(PAGES.keys())
+    if st.session_state.get("active_page") not in available_pages:
+        st.session_state.active_page = available_pages[0]
     page = st.sidebar.radio(
         "Control Tower",
-        list(PAGES.keys()),
+        available_pages,
         key="active_page",
     )
     st.sidebar.markdown("---")
@@ -66,16 +65,8 @@ def render_sidebar() -> str:
                     <div class="sidebar-step-text">Show the governed inventory of enterprise AI agents.</div>
                 </div>
                 <div class="sidebar-step">
-                    <div class="sidebar-step-name">4. Agent Details</div>
-                    <div class="sidebar-step-text">Drill into ownership, Trust Score and audit history.</div>
-                </div>
-                <div class="sidebar-step">
-                    <div class="sidebar-step-name">5. Live Agent Audit</div>
-                    <div class="sidebar-step-text">Run a focused Sentinel audit for one enterprise Agent.</div>
-                </div>
-                <div class="sidebar-step">
-                    <div class="sidebar-step-name">6. Analytics</div>
-                    <div class="sidebar-step-text">Close with trust, policy, cost and recommendation trends.</div>
+                    <div class="sidebar-step-name">4. Governance Framework</div>
+                    <div class="sidebar-step-text">Explain Sentinel's governance methodology for judges and enterprise users.</div>
                 </div>
             </div>
             """,

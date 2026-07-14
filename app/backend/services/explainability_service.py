@@ -1,20 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from statistics import mean
 from typing import Any
 
 from app.backend.repositories.audit_run_repository import AuditRunRepository
 from app.backend.repositories.trust_score_repository import TrustScoreRepository
+from app.utils.trust_score_model import TRUST_SCORE_WEIGHTS
 
-
-SCORE_WEIGHTS = {
-    "Hallucination Risk": 0.25,
-    "Policy Compliance": 0.30,
-    "Cost Efficiency": 0.20,
-    "Feedback Quality": 0.15,
-    "Historical Reliability": 0.10,
-}
 
 SEVERITY_RANK = {
     "critical": 4,
@@ -37,8 +29,7 @@ class ExplainabilityService:
         recommendations: list[dict[str, Any]],
     ) -> dict[str, Any]:
         trust_score = self.trust_scores.get_by_run(audit_run["id"])
-        historical_reliability = self._historical_reliability(audit_run["agent_id"], audit_run["id"])
-        breakdown = self._score_breakdown(trust_score, historical_reliability)
+        breakdown = self._score_breakdown(trust_score)
         executive_summary = self._executive_summary(
             audit_run,
             policy_violations,
@@ -63,38 +54,26 @@ class ExplainabilityService:
     def _score_breakdown(
         self,
         trust_score: dict[str, Any] | None,
-        historical_reliability: int,
     ) -> list[dict[str, Any]]:
         if not trust_score:
             return []
 
         factors = [
-            ("Hallucination Risk", trust_score["hallucination_score"], "Unsupported claims and factual grounding."),
-            ("Policy Compliance", trust_score["policy_score"], "PII, compliance and enterprise policy controls."),
+            ("Policy Compliance", trust_score["policy_score"], "Policies Passed / Total Policies."),
+            ("Safety", trust_score["hallucination_score"], "Average of Hallucination Check and PII Check."),
             ("Cost Efficiency", trust_score["cost_score"], "Token usage and run-level operating cost."),
-            ("Feedback Quality", trust_score["feedback_score"], "Human Feedback and reviewer confidence."),
-            ("Historical Reliability", historical_reliability, "Prior AuditRun consistency for this Agent."),
+            ("Review Status", trust_score["feedback_score"], "Automatic enterprise governance review status."),
         ]
         return [
             {
                 "factor": factor,
                 "score": score,
-                "weight": SCORE_WEIGHTS[factor],
-                "weighted_points": round(score * SCORE_WEIGHTS[factor], 1),
+                "weight": TRUST_SCORE_WEIGHTS[factor],
+                "weighted_points": round(score * TRUST_SCORE_WEIGHTS[factor], 1),
                 "explanation": explanation,
             }
             for factor, score, explanation in factors
         ]
-
-    def _historical_reliability(self, agent_id: str, current_audit_run_id: str) -> int:
-        prior_scores = [
-            score["overall_score"]
-            for score in self.trust_scores.list_by_agent(agent_id)
-            if score.get("audit_run_id") != current_audit_run_id
-        ]
-        if not prior_scores:
-            return 86
-        return round(mean(prior_scores))
 
     def _executive_summary(
         self,
@@ -121,9 +100,9 @@ class ExplainabilityService:
                 "recommended_owner": "AI Platform Owner",
                 "priority": "High",
             }
-        if audit_run["total_tokens"] >= 8000:
+        if audit_run["total_tokens"] >= 1500:
             return {
-                "business_impact": "High token usage increases operating cost.",
+                "business_impact": "Elevated token usage increases operating cost.",
                 "risk_level": "Medium",
                 "estimated_business_impact": "Cost reduction opportunity through context compression and reuse.",
                 "recommended_owner": "AI Developer",
@@ -166,7 +145,7 @@ class ExplainabilityService:
             estimated_impact = "High trust improvement"
             suggested_action = "Require approved evidence before financial or operational claims are shown."
         elif recommendation_type == "cost":
-            reason = "High token usage"
+            reason = "Elevated token usage"
             expected_benefit = "Lowers Average Cost per Run and improves Agent reuse efficiency."
             estimated_impact = "Medium cost saving opportunity"
             suggested_action = "Cache repeated context, summarize vendor evidence and remove duplicated prompt sections."

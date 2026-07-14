@@ -8,6 +8,7 @@ from app.frontend.components.layout import empty_state, page_header
 from app.frontend.components.metric_cards import metric_card
 from app.frontend.components.tables import dataframe
 from app.frontend.components.trust_scores import trust_score_state
+from app.utils.trust_score_model import TRUST_SCORE_WEIGHTS
 
 
 def render_agent_details() -> None:
@@ -15,7 +16,7 @@ def render_agent_details() -> None:
     agents = service.list_agents()
     page_header(
         "Agent Details",
-        "Review ownership, Trust Score history, AuditRun history, Recommendations and Human Feedback for one Agent.",
+        "Review ownership, Trust Score history, AuditRun history, Recommendations and Review Status for one Agent.",
     )
     if not agents:
         empty_state("No agents registered", "Demo Mode will seed HR Assistant, Finance Copilot and Procurement Agent on startup.")
@@ -42,10 +43,11 @@ def render_agent_details() -> None:
             state = trust_score_state(score["overall_score"])
             metric_card("Trust State", state["label"], f"Trust Score {score['overall_score']}", state["metric_status"])
             st.plotly_chart(trust_score_gauge(score["overall_score"]), use_container_width=True)
+            _render_latest_score_breakdown(score)
         else:
             empty_state("No Trust Score available", "Run Live Agent Audit to generate the first Trust Score.")
 
-    tabs = st.tabs(["AuditRun History", "Recommendations", "Human Feedback"])
+    tabs = st.tabs(["AuditRun History", "Recommendations", "Review Status"])
     with tabs[0]:
         dataframe(
             [
@@ -85,3 +87,20 @@ def render_agent_details() -> None:
                 for item in details["feedback"]
             ]
         )
+
+
+def _render_latest_score_breakdown(score: dict) -> None:
+    st.markdown("**Trust Score Breakdown**")
+    rows = [
+        ("Policy Compliance", score["policy_score"]),
+        ("Safety", score["hallucination_score"]),
+        ("Cost Efficiency", score["cost_score"]),
+        ("Review Status", score["feedback_score"]),
+    ]
+    for label, value in rows:
+        weight = TRUST_SCORE_WEIGHTS[label]
+        st.progress(
+            value / 100,
+            text=f"{label}: {value}/100 | Weight {weight:.0%} | Contribution {round(value * weight, 1)} pts",
+        )
+    st.caption(f"Final Trust Score: {score['overall_score']}/100")

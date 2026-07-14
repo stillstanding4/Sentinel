@@ -50,7 +50,8 @@ def _render_result(result: dict) -> None:
     with cols[0]:
         metric_card("Agent", audit_run["agent_name"], audit_run["business_unit"], "neutral")
     with cols[1]:
-        metric_card("Tokens", f"{audit_run['total_tokens']:,}", "Cost Analysis", "watch" if audit_run["total_tokens"] > 8000 else "good")
+        token_status = "risk" if audit_run["total_tokens"] > 2500 else "watch" if audit_run["total_tokens"] >= 1500 else "good"
+        metric_card("Tokens", f"{audit_run['total_tokens']:,}", "Cost Analysis", token_status)
     with cols[2]:
         metric_card("Estimated Cost", f"${audit_run['estimated_cost']:.4f}", "Average Cost per Run signal", "neutral")
     with cols[3]:
@@ -64,7 +65,7 @@ def _render_result(result: dict) -> None:
     section_divider("Audit Workflow", "Timestamped Sentinel audit lifecycle.")
     _render_audit_timeline(result.get("audit_timeline", []))
 
-    tabs = st.tabs(["Hallucination Check", "Policy Check", "Recommendations", "Human Feedback"])
+    tabs = st.tabs(["Hallucination Check", "Policy Check", "Recommendations", "Review Status"])
     with tabs[0]:
         dataframe(
             [
@@ -96,7 +97,7 @@ def _render_result(result: dict) -> None:
             rating = st.slider("Rating", min_value=1, max_value=5, value=4)
             decision = st.selectbox("Decision", ["approve", "reject", "needs_review", "resolved"])
             comment = st.text_area("Comment", value="Reviewed during Live Agent Audit.")
-            submitted = st.form_submit_button("Submit Human Feedback")
+            submitted = st.form_submit_button("Submit Review Status")
         if submitted:
             FeedbackService().submit_feedback(
                 audit_run_id=audit_run["id"],
@@ -106,7 +107,7 @@ def _render_result(result: dict) -> None:
                 comment=comment,
                 decision=decision,
             )
-            st.success("Human Feedback captured. Dashboard Updated.")
+            st.success("Review Status captured. Dashboard Updated.")
 
 
 def _render_executive_summary(summary: dict) -> None:
@@ -151,9 +152,9 @@ def _render_score_breakdown(result: dict) -> None:
     if not trust_score or not breakdown:
         return
 
-    section_divider("Explainable Trust Score", "Weighted contribution of each factor to the Agent trust decision.")
+    section_divider("Trust Score Breakdown", "Weighted contribution of each factor to the Agent trust decision.")
     state = trust_score_state(trust_score["overall_score"])
-    st.metric("Overall Trust Score", trust_score["overall_score"], state["label"])
+    st.metric("Final Trust Score", f"{trust_score['overall_score']}/100", state["label"])
     for factor in breakdown:
         st.progress(
             factor["score"] / 100,

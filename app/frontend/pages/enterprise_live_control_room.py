@@ -17,6 +17,7 @@ from app.frontend.components.policies import (
     policy_violation_cards_html,
 )
 from app.frontend.components.trust_scores import trust_score_state
+from app.utils.trust_score_model import SCENARIO_POLICY_FAILURES
 
 
 AGENT_SEQUENCE = [
@@ -36,12 +37,21 @@ PIPELINE_STEPS = [
     "Recommendations",
 ]
 
+
+def _scenarios_failing(policy_id: str) -> set[str]:
+    return {
+        scenario_key
+        for scenario_key, failed_policy_ids in SCENARIO_POLICY_FAILURES.items()
+        if policy_id in failed_policy_ids
+    }
+
+
 POLICY_CHECKS = [
-    {"id": "P001", "fails_for": {"hr_pii_leak"}},
-    {"id": "P002", "fails_for": {"finance_hallucination"}},
-    {"id": "P003", "fails_for": set()},
-    {"id": "P004", "fails_for": {"procurement_high_tokens"}},
-    {"id": "P005", "fails_for": {"hr_pii_leak", "finance_hallucination", "procurement_high_tokens"}},
+    {"id": "P001", "fails_for": _scenarios_failing("P001")},
+    {"id": "P002", "fails_for": _scenarios_failing("P002")},
+    {"id": "P003", "fails_for": _scenarios_failing("P003")},
+    {"id": "P004", "fails_for": _scenarios_failing("P004")},
+    {"id": "P005", "fails_for": _scenarios_failing("P005")},
 ]
 
 STATUS_SEQUENCE = ["Receiving Prompt", "Generating Response", "Auditing", "Governance Complete"]
@@ -211,7 +221,7 @@ def _run_control_room_simulation(
 
     selected_result = _result_for_agent(results, selected_agent_key)
     _append_event(events, "Recommendation generated.")
-    _append_event(events, "Dashboard, Agent Catalogue, Agent Details and Analytics updated.")
+    _append_event(events, "Dashboard and Agent Catalogue updated.")
     _render_agent_workspace(agent_container, selected_agent_key, "Governance Complete", response)
     _render_audit_result(tower_container, selected_result)
     _render_event_feed(event_container, events)
@@ -450,6 +460,7 @@ def _render_audit_result(container: Any, result: dict) -> None:
             f'<div class="risk-chip risk-{trust_state["status"]}">{trust_state["label"]}</div>'
             "</div>"
             '<div class="result-detail-stack">'
+            f'{_trust_breakdown_html(result)}'
             f'{_policy_result_line(policy_ids)}'
             f'{_result_line("Business Impact", summary["business_impact"])}'
             f'{_result_line("Recommended Action", recommendation)}'
@@ -460,6 +471,31 @@ def _render_audit_result(container: Any, result: dict) -> None:
             "</div>"
         ),
         unsafe_allow_html=True,
+    )
+
+
+def _trust_breakdown_html(result: dict) -> str:
+    breakdown = result.get("score_breakdown") or []
+    if not breakdown:
+        return ""
+    rows = []
+    for factor in breakdown:
+        score = int(factor["score"])
+        rows.append(
+            '<div class="result-breakdown-row">'
+            f'<span>{escape(factor["factor"])}</span>'
+            '<div class="result-breakdown-bar">'
+            f'<div class="result-breakdown-fill" style="width: {score}%"></div>'
+            "</div>"
+            f'<strong>{score}/100</strong>'
+            "</div>"
+        )
+    return (
+        '<div class="result-breakdown">'
+        '<div class="result-breakdown-title">Trust Score Breakdown</div>'
+        f'{"".join(rows)}'
+        f'<div class="result-breakdown-final">Final Trust Score {result["trust_score"]["overall_score"]}/100</div>'
+        "</div>"
     )
 
 
@@ -524,13 +560,13 @@ def _events_for_step(step: str, scenario_key: str) -> list[str]:
         return [policy_event_text("P001", failed=scenario_key == "hr_pii_leak")]
     if step == "Hallucination Detection":
         return (
-            ["Hallucination detected. Human Review required."]
+            ["Hallucination detected. Review Status set to Needs Review."]
             if scenario_key == "finance_hallucination"
             else ["Hallucination threshold passed."]
         )
     if step == "Cost Analysis":
         return (
-            ["High token usage detected."]
+            ["Elevated token usage detected. Cost Efficiency scored at 80/100."]
             if scenario_key == "procurement_high_tokens"
             else ["Cost usage is within governance threshold."]
         )
@@ -547,7 +583,7 @@ def _policy_engine_event(scenario_key: str) -> str:
     if scenario_key == "finance_hallucination":
         return policy_event_text("P002", failed=True)
     if scenario_key == "procurement_high_tokens":
-        return policy_event_text("P004", failed=True)
+        return "Policy engine passed."
     return "Policy engine passed."
 
 
@@ -597,7 +633,7 @@ def _average_confidence(results: list[dict]) -> int:
 
 
 def _estimated_cost_savings(total_tokens: int) -> str:
-    if total_tokens < 8000:
+    if total_tokens < 1500:
         return "$0.00 per high-volume run"
-    saved_tokens = round(total_tokens * 0.35)
+    saved_tokens = round(total_tokens * 0.20 if total_tokens <= 2500 else total_tokens * 0.35)
     return f"~{saved_tokens:,} tokens per optimized run"
