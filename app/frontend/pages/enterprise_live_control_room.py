@@ -448,7 +448,7 @@ def _render_audit_result(container: Any, result: dict) -> None:
     policy_ids = infer_policy_ids_for_result(result)
     recommendation = _recommended_action(result)
     confidence = _average_confidence([result])
-    savings = _estimated_cost_savings(audit_run["total_tokens"])
+    savings = _estimated_cost_saving_percent(audit_run.get("scenario_key"))
 
     container.markdown(
         (
@@ -465,7 +465,7 @@ def _render_audit_result(container: Any, result: dict) -> None:
             f'{_result_line("Business Impact", summary["business_impact"])}'
             f'{_result_line("Recommended Action", recommendation)}'
             f'{_result_line("Owner", summary["recommended_owner"])}'
-            f'{_result_line("Estimated Savings", savings)}'
+            f'{_cost_saving_result_line(savings)}'
             f'{_result_line("Confidence", f"{confidence}%")}'
             "</div>"
             "</div>"
@@ -504,6 +504,16 @@ def _result_line(label: str, value: str) -> str:
         '<div class="result-line">'
         f'<div class="result-line-label">{escape(label)}</div>'
         f'<div class="result-line-value">{escape(value)}</div>'
+        "</div>"
+    )
+
+
+def _cost_saving_result_line(value: str) -> str:
+    return (
+        '<div class="result-line">'
+        '<div class="result-line-label">Estimated Cost Saving (%)</div>'
+        f'<div class="result-line-value">{escape(value)}</div>'
+        '<div class="result-line-caption">Estimated reduction in LLM inference cost after applying Sentinel recommendations.</div>'
         "</div>"
     )
 
@@ -632,8 +642,10 @@ def _average_confidence(results: list[dict]) -> int:
     return round(sum(confidences) / len(confidences))
 
 
-def _estimated_cost_savings(total_tokens: int) -> str:
-    if total_tokens < 1500:
-        return "$0.00 per high-volume run"
-    saved_tokens = round(total_tokens * 0.20 if total_tokens <= 2500 else total_tokens * 0.35)
-    return f"~{saved_tokens:,} tokens per optimized run"
+def _estimated_cost_saving_percent(scenario_key: str | None) -> str:
+    savings_by_scenario = {
+        "procurement_high_tokens": "22%",
+        "finance_hallucination": "15%",
+        "hr_pii_leak": "5%",
+    }
+    return savings_by_scenario.get(scenario_key or "", "10%")

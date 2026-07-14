@@ -54,7 +54,7 @@ SCORE_WEIGHTS = [
 
 def render_governance_framework() -> None:
     page_header(
-        "📚 Governance Framework",
+        "Governance Framework",
         "Transparent methodology for how Sentinel evaluates enterprise AI agents across policy, safety, cost and review status signals.",
         eyebrow="Sentinel Methodology",
     )

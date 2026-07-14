@@ -23,7 +23,7 @@ PAGES = {
     "Enterprise Live Control Room": render_enterprise_live_control_room,
     "Dashboard": render_dashboard,
     "Agent Catalogue": render_agent_catalogue,
-    "📚 Governance Framework": render_governance_framework,
+    "Governance Framework": render_governance_framework,
 }
 
 

@@ -992,6 +992,12 @@ def apply_enterprise_theme() -> None:
             font-weight: 680;
             margin-top: 7px;
         }
+        .result-line-caption {
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1.45;
+            margin-top: 5px;
+        }
         .event-stream-card {
             background: #ffffff;
             padding: 22px;
