@@ -20,9 +20,9 @@ from app.frontend.styles import apply_enterprise_theme
 
 
 PAGES = {
-    "Enterprise Live Control Room": render_enterprise_live_control_room,
     "Dashboard": render_dashboard,
     "Agent Catalogue": render_agent_catalogue,
+    "Enterprise Live Control Room": render_enterprise_live_control_room,
     "Governance Framework": render_governance_framework,
 }
 
@@ -53,16 +53,16 @@ def render_sidebar() -> str:
             """
             <div class="sidebar-walkthrough">
                 <div class="sidebar-step">
-                    <div class="sidebar-step-name">1. Enterprise Live Control Room</div>
-                    <div class="sidebar-step-text">Open with Sentinel monitoring multiple enterprise Agents in real time.</div>
-                </div>
-                <div class="sidebar-step">
-                    <div class="sidebar-step-name">2. Dashboard</div>
+                    <div class="sidebar-step-name">1. Dashboard</div>
                     <div class="sidebar-step-text">Show enterprise health, risks and latest Sentinel signals.</div>
                 </div>
                 <div class="sidebar-step">
-                    <div class="sidebar-step-name">3. Agent Catalogue</div>
+                    <div class="sidebar-step-name">2. Agent Catalogue</div>
                     <div class="sidebar-step-text">Show the governed inventory of enterprise AI agents.</div>
+                </div>
+                <div class="sidebar-step">
+                    <div class="sidebar-step-name">3. Enterprise Live Control Room</div>
+                    <div class="sidebar-step-text">Open with Sentinel monitoring multiple enterprise Agents in real time.</div>
                 </div>
                 <div class="sidebar-step">
                     <div class="sidebar-step-name">4. Governance Framework</div>

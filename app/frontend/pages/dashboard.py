@@ -85,9 +85,9 @@ HIGHEST_RISK_AGENTS = [
 ]
 
 GOVERNANCE_WATCHLIST = [
-    {"time": "11:42", "agent": "HR Assistant", "policy": "P001", "severity": "Critical", "recommendation": "Mask employee SSN", "status": "Open"},
-    {"time": "11:40", "agent": "Finance Copilot", "policy": "P002", "severity": "Medium", "recommendation": "Add evidence", "status": "In Progress"},
-    {"time": "11:36", "agent": "Procurement", "policy": "P005", "severity": "Low", "recommendation": "Human approval", "status": "Resolved"},
+    {"date": "Jul 14, 2026", "agent": "HR Assistant", "policy": "P001", "severity": "Critical", "recommendation": "Mask employee SSN", "status": "Open"},
+    {"date": "Jul 14, 2026", "agent": "Finance Copilot", "policy": "P002", "severity": "Medium", "recommendation": "Add evidence", "status": "In Progress"},
+    {"date": "Jul 13, 2026", "agent": "Procurement", "policy": "P005", "severity": "Low", "recommendation": "Human approval", "status": "Resolved"},
 ]
 
 CHART_COLORS = ["#2563EB", "#22C55E", "#14B8A6", "#8B5CF6", "#F59E0B", "#64748B"]
@@ -280,7 +280,7 @@ def _render_governance_watchlist() -> None:
     rows = "".join(
         (
             "<tr>"
-            f"<td>{escape(row['time'])}</td>"
+            f"<td>{escape(row['date'])}</td>"
             f"<td>{escape(row['agent'])}</td>"
             f"<td><span class=\"dash-policy-pill\">{escape(row['policy'])}</span></td>"
             f"<td>{_badge(row['severity'], _risk_state(row['severity']))}</td>"
@@ -293,7 +293,7 @@ def _render_governance_watchlist() -> None:
     _render_table_card(
         "Governance Watchlist",
         "Agents and policy actions requiring follow-up",
-        ["Time", "Agent", "Policy", "Severity", "Recommendation", "Status"],
+        ["Date", "Agent", "Policy", "Severity", "Recommendation", "Status"],
         rows,
         full_width=True,
     )
