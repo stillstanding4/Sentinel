@@ -218,10 +218,10 @@ def _activity_trend_chart() -> go.Figure:
     )
     fig.update_layout(
         title={"text": "Enterprise Agent Activity Trend", "x": 0.02, "xanchor": "left"},
-        height=340,
+        height=360,
         paper_bgcolor="#FFFFFF",
         plot_bgcolor="#FFFFFF",
-        margin={"l": 38, "r": 22, "t": 72, "b": 42},
+        margin={"l": 42, "r": 22, "t": 64, "b": 34},
         xaxis={"showgrid": False, "linecolor": "#E2E8F0", "tickfont": {"color": "#334155"}},
         yaxis={
             "title": {"text": "Active Agents", "font": {"size": 12, "color": "#475569"}},
@@ -451,6 +451,7 @@ def _inject_dashboard_styles() -> None:
             border: 1px solid #E5EAF1;
             border-radius: 16px;
             padding: 10px 12px 4px;
+            min-height: 390px;
             box-shadow: 0 14px 34px rgba(15, 23, 42, 0.065);
         }
         .dash-table-card {
@@ -458,7 +459,8 @@ def _inject_dashboard_styles() -> None:
             border: 1px solid #E5EAF1;
             border-radius: 16px;
             padding: 22px;
-            margin-top: 18px;
+            margin-top: 22px;
+            min-height: 250px;
             box-shadow: 0 14px 34px rgba(15, 23, 42, 0.065);
         }
         .dash-table-card-full {
